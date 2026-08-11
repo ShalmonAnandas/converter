@@ -2,7 +2,7 @@
 
 A local-first developer workbench for formatting, validating, encoding, and converting data. The current release includes functional JSON, XML, CSV/spreadsheet, Markdown document, Base64, URL, timestamp, JWT inspection, and SHA-2 hashing tools, plus a searchable registry, keyboard command palette, themes, downloadable outputs, and privacy-visible processing indicators.
 
-The spreadsheet workbench currently handles CSV/TSV delimiter conversion and inspection; XLSX workbook support remains a separate milestone. The document workbench produces safe semantic HTML and print previews; DOCX/PDF archive generation remains a separate milestone.
+The spreadsheet workbench creates standards-based XLSX workbooks from CSV and extracts the first worksheet from XLSX as CSV. The document workbench generates styled Word-compatible DOCX files from Markdown and extracts headings and paragraphs from DOCX as Markdown. Office archives are processed locally with entry-count, expanded-size, and path-traversal safety limits.
 
 ## Run locally
 

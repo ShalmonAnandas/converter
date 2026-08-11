@@ -7,7 +7,7 @@
     "dev": "node scripts/serve.js",
     "build": "node scripts/build.js",
     "test": "node --test",
-    "typecheck": "node --check public/app.js && node --check public/core.js && node --check public/tools.js && node --check scripts/serve.js"
+    "typecheck": "node --check public/app.js && node --check public/core.js && node --check public/tools.js && node --check public/office.js && node --check scripts/serve.js"
   },
   "engines": { "node": ">=20" },
   "packageManager": "pnpm@10.28.1"
