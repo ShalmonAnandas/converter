@@ -4,6 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="A private, local-first workbench for developer data.">
   <title>Converter — Developer tools, one workspace</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -37,7 +38,7 @@
         <div class="workbench-header"><div class="workbench-icon" id="workbenchIcon">{ }</div><div><span class="local-badge">● LOCAL PROCESSING</span><h2 id="workbenchTitle">JSON Formatter</h2><p id="workbenchDescription"></p></div><button id="closeWorkbench" class="icon-button" aria-label="Close tool">×</button></div>
         <div class="options" id="options"></div>
         <div class="editor-grid">
-          <div class="editor-panel"><div class="editor-top"><label for="inputEditor">INPUT</label><span id="inputSize">0 B</span></div><textarea id="inputEditor" spellcheck="false" placeholder="Paste your data here..."></textarea></div>
+          <div class="editor-panel"><div class="editor-top"><label for="inputEditor">INPUT</label><span id="inputSize">0 B</span></div><textarea id="inputEditor" spellcheck="false" placeholder="Paste your data here..." aria-describedby="diagnostic"></textarea></div>
           <div class="editor-panel"><div class="editor-top"><label for="outputEditor">OUTPUT</label><span id="outputSize">0 B</span></div><textarea id="outputEditor" spellcheck="false" readonly placeholder="Your result will appear here..."></textarea></div>
         </div>
         <div class="diagnostic hidden" id="diagnostic" role="status"></div>

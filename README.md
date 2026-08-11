@@ -1,6 +1,8 @@
 # Converter
 
-A local-first developer workbench for formatting, validating, encoding, and converting data. The current foundation release includes functional JSON, Base64, URL, and timestamp tools, a searchable registry, keyboard command palette, theme controls, downloadable outputs, and privacy-visible processing indicators. Base64 Studio provides strict diagnostics, safe normalization, Base64URL support, and Data URI inspection.
+A local-first developer workbench for formatting, validating, encoding, and converting data. The current release includes functional JSON, XML, CSV/spreadsheet, Markdown document, Base64, URL, timestamp, JWT inspection, and SHA-2 hashing tools, plus a searchable registry, keyboard command palette, themes, downloadable outputs, and privacy-visible processing indicators.
+
+The spreadsheet workbench creates standards-based XLSX workbooks from CSV and extracts the first worksheet from XLSX as CSV. The document workbench generates styled Word-compatible DOCX files from Markdown and extracts headings and paragraphs from DOCX as Markdown. Office archives are processed locally with entry-count, expanded-size, and path-traversal safety limits.
 
 ## Run locally
 
