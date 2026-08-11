@@ -1,0 +1,14 @@
+{
+  "name": "converter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.js",
+    "build": "node scripts/build.js",
+    "test": "node --test",
+    "typecheck": "node --check public/app.js && node --check public/core.js && node --check scripts/serve.js"
+  },
+  "engines": { "node": ">=20" },
+  "packageManager": "pnpm@10.28.1"
+}
