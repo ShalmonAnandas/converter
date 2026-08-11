@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A private, local-first workbench for developer data.">
+  <title>Converter — Developer tools, one workspace</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Converter home"><span class="brand-mark">C</span><span>Converter</span></a>
+    <button class="command-search" id="commandButton"><span>⌕</span><span>Search tools and actions...</span><kbd>⌘ K</kbd></button>
+    <nav class="top-actions" aria-label="Global actions"><button class="icon-button" id="themeButton" aria-label="Toggle theme">☼</button><a class="github" href="https://github.com" aria-label="GitHub">⌁</a></nav>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <nav id="toolNav" aria-label="Tools"></nav>
+      <div class="sidebar-card"><span class="pulse-dot"></span><div><strong>Private by default</strong><p>Your data stays in this browser.</p></div></div>
+      <div class="sidebar-footer"><button id="shortcutsButton">⌨ Keyboard shortcuts</button><span>v0.1.0</span></div>
+    </aside>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow"><span></span> LOCAL-FIRST DEVELOPER TOOLKIT</div>
+        <h1>Convert anything.<br><em>Keep everything private.</em></h1>
+        <p>A fast, precise workbench for the formats developers use every day. Your files never leave your browser.</p>
+        <div class="hero-pills"><span>✣ No uploads</span><span>ϟ Instant processing</span><span>◇ Open source</span></div>
+      </section>
+
+      <section class="registry-section">
+        <div class="section-heading"><div><h2>Choose a tool</h2><p>Everything you need, exactly where you expect it.</p></div><label class="filter"><span>⌕</span><input id="filterInput" placeholder="Filter tools..." aria-label="Filter tools"></label></div>
+        <div id="toolGrid" class="tool-grid"></div>
+      </section>
+
+      <section class="workbench hidden" id="workbench" aria-labelledby="workbenchTitle">
+        <div class="workbench-header"><div class="workbench-icon" id="workbenchIcon">{ }</div><div><span class="local-badge">● LOCAL PROCESSING</span><h2 id="workbenchTitle">JSON Formatter</h2><p id="workbenchDescription"></p></div><button id="closeWorkbench" class="icon-button" aria-label="Close tool">×</button></div>
+        <div class="options" id="options"></div>
+        <div class="editor-grid">
+          <div class="editor-panel"><div class="editor-top"><label for="inputEditor">INPUT</label><span id="inputSize">0 B</span></div><textarea id="inputEditor" spellcheck="false" placeholder="Paste your data here..." aria-describedby="diagnostic"></textarea></div>
+          <div class="editor-panel"><div class="editor-top"><label for="outputEditor">OUTPUT</label><span id="outputSize">0 B</span></div><textarea id="outputEditor" spellcheck="false" readonly placeholder="Your result will appear here..."></textarea></div>
+        </div>
+        <div class="diagnostic hidden" id="diagnostic" role="status"></div>
+        <div class="workbench-actions"><button class="secondary" id="resetButton">Reset</button><div><button class="secondary" id="downloadButton">Download</button><button class="secondary" id="copyButton">Copy output</button><button class="primary" id="runButton">Format JSON <span>→</span></button></div></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="commandDialog" aria-label="Tool command palette"><div class="dialog-search"><span>⌕</span><input id="commandInput" aria-label="Search every tool" placeholder="Search every tool..." autocomplete="off"><kbd>ESC</kbd></div><div id="commandResults"></div></dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
