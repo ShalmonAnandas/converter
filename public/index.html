@@ -121,17 +121,21 @@
             <textarea id="secondaryArea" spellcheck="false" autocomplete="off"></textarea>
           </section>
 
-          <section class="pane" id="outputPane">
+          <section class="pane pane-output" id="outputPane">
             <div class="pane-head">
-              <label class="pane-label" for="outputArea">Output</label>
+              <label class="pane-label" for="outputArea">Result</label>
               <div class="pane-tools">
                 <span class="meter" id="outputMeter">0 B</span>
+                <button class="button tiny" id="rawButton" hidden aria-pressed="false">Raw</button>
                 <button class="button tiny" id="previewButton" hidden aria-pressed="false">Preview</button>
                 <button class="button tiny" id="copyButton">Copy</button>
                 <button class="button tiny" id="downloadButton">Download</button>
               </div>
             </div>
             <textarea id="outputArea" spellcheck="false" readonly placeholder="Results appear here."></textarea>
+            <dl class="report" id="report" hidden></dl>
+            <div class="diff" id="diff" hidden></div>
+            <div class="cards" id="cards" hidden></div>
             <div class="preview" id="preview" hidden></div>
             <div class="swatches" id="swatches" hidden></div>
           </section>

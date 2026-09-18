@@ -15,7 +15,7 @@ pnpm dev        # http://localhost:3000
 ```
 
 ```bash
-pnpm test       # 93 unit tests across the whole library
+pnpm test       # 95 unit tests across the whole library
 pnpm typecheck  # syntax checks every module
 pnpm check      # typecheck + test
 pnpm build      # validates and copies the static artifact to dist/
@@ -43,6 +43,24 @@ Node 20 or newer. No install step is required — the project has no runtime dep
 Every tool is deep-linkable (`/#/subnet`), reachable from the command palette
 (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>), and runs live as you type where that makes
 sense. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> runs the current tool.
+
+## How a tool looks
+
+Tools do different jobs, so they get different shapes. Each one declares a layout in the
+registry and the interface builds it:
+
+| Layout | Used for | What you see |
+| --- | --- | --- |
+| **split** | format conversion — JSON, YAML, CSV, Base64 | two tall editors side by side |
+| **stack** | questions with an answer — subnets, dates, chmod, colour | a short input over a full-width result |
+| **compare** | diffs | two inputs above a result, additions and removals coloured |
+| **canvas** | visual output — QR codes, colour, images | the picture beside its numbers |
+
+The result itself picks its own presentation. A tool that answers with labelled values
+returns rows, which render as a real table where every value can be copied on its own —
+not an aligned monospace blob. Generators return a list, which renders as click-to-copy
+cards. Markup renders as a preview. Anything else falls back to a text box, and a **Raw**
+button always shows the plain text behind whichever view you are looking at.
 
 ## Things worth knowing
 
@@ -79,10 +97,10 @@ public/
   index.html      the shell
   styles.css      the design system
   app.js          the interface — generic, driven entirely by the registry
-  registry.js     every tool as data: metadata, controls, and one run function
-  lib/            18 dependency-free modules doing the actual work
+  registry.js     every tool as data: metadata, controls, layout, and one run function
+  lib/            19 dependency-free modules doing the actual work
 scripts/          dev server and build validation
-test/             93 unit tests
+test/             95 unit tests
 ```
 
 Adding a tool means adding one entry to `registry.js`. The interface, sidebar, search,
@@ -93,6 +111,13 @@ command palette, deep link, and download handling all follow automatically.
 Import the repository into Vercel and deploy. `vercel.json` serves the static files and
 applies the security headers; `scripts/serve.js` applies the same headers locally so
 development and production behave identically.
+
+## Readability
+
+Text colours are solved against the surfaces they actually sit on rather than picked by
+eye: body text clears 13:1, secondary text 7:1, and the quietest label 5:1, in both
+themes. `test/` covers the conversions; the contrast targets are checked with the
+project's own `lib/color.js` against the rendered page.
 
 ## Privacy
 

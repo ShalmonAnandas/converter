@@ -3,6 +3,7 @@
 // platform does not expose and which is implemented here for legacy checksums.
 
 import { bytesToHex, bytesToBase64, base64ToBytes, textToBytes, bytesToText, crc32, randomBytes, randomIndex, hexToBytes } from "./bytes.js";
+import { report } from "./report.js";
 
 const WEB_CRYPTO_HASHES = { "SHA-1": "SHA-1", "SHA-256": "SHA-256", "SHA-384": "SHA-384", "SHA-512": "SHA-512" };
 
@@ -30,8 +31,7 @@ export async function hashAll(input) {
   const bytes = typeof input === "string" ? textToBytes(input) : input;
   const rows = [];
   for (const algorithm of HASH_ALGORITHMS) rows.push([algorithm, bytesToHex(await digestBytes(bytes, algorithm))]);
-  const width = Math.max(...rows.map(([name]) => name.length));
-  return rows.map(([name, value]) => `${name.padEnd(width)}  ${value}`).join("\n");
+  return report(rows);
 }
 
 function encodeDigest(digest, encoding) {
@@ -106,15 +106,16 @@ export async function pbkdf2Report(password, saltText, iterations, hash, length)
   if (!password) throw new Error("Enter a password");
   const salt = saltText ? textToBytes(saltText) : randomBytes(16);
   const key = await deriveKey(password, salt, { iterations, hash, length });
-  return [
-    `Algorithm     PBKDF2-${hash}`,
-    `Iterations    ${iterations.toLocaleString("en-US")}`,
-    `Salt (hex)    ${bytesToHex(salt)}`,
-    `Key length    ${length} bytes`,
+  return report([
+    ["Algorithm", `PBKDF2-${hash}`],
+    ["Iterations", iterations.toLocaleString("en-US")],
+    ["Salt (hex)", bytesToHex(salt)],
+    ["Key length", `${length} bytes`],
     "",
-    `Key (hex)     ${bytesToHex(key)}`,
-    `Key (base64)  ${bytesToBase64(key)}`,
-  ].join("\n");
+    "Derived key",
+    ["Hex", bytesToHex(key), "accent"],
+    ["Base64", bytesToBase64(key), "accent"],
+  ]);
 }
 
 /* ---------------------------------------------------------------- aes ---- */
@@ -346,16 +347,17 @@ export function analyzePassword(password) {
   const verdict = verdicts.find(([threshold]) => effective < threshold)[1];
   const guessesPerSecond = 1e11;
   const seconds = 2 ** (effective - 1) / guessesPerSecond;
-  return [
-    `Verdict        ${verdict}`,
-    `Length         ${password.length} characters`,
-    `Alphabet       ${pool} possible characters`,
-    `Raw entropy    ${entropy.toFixed(1)} bits`,
-    `Adjusted       ${effective.toFixed(1)} bits`,
-    `Offline crack  ${describeDuration(seconds)} at 10^11 guesses/second`,
+  return report([
+    ["Verdict", verdict, effective >= 60 ? "good" : effective >= 40 ? undefined : "bad"],
+    ["Length", `${password.length} characters`],
+    ["Alphabet", `${pool} possible characters`],
+    ["Raw entropy", `${entropy.toFixed(1)} bits`],
+    ["Adjusted", `${effective.toFixed(1)} bits`],
+    ["Offline crack", `${describeDuration(seconds)} at 10^11 guesses/second`],
     "",
-    penalties.length ? `Issues\n${penalties.map((issue) => `  · ${issue}`).join("\n")}` : "Issues\n  · None detected",
-  ].join("\n");
+    "Issues",
+    ...(penalties.length ? penalties.map((issue, index) => [`Issue ${index + 1}`, issue, "bad"]) : [["Issues", "None detected", "good"]]),
+  ]);
 }
 
 function describeDuration(seconds) {
@@ -387,14 +389,16 @@ export function generateToken({ length = 32, alphabet = "alphanumeric" } = {}) {
 export function basicAuthHeader(username, password) {
   if (!username) throw new Error("Enter a username");
   const credentials = bytesToBase64(textToBytes(`${username}:${password}`));
-  return [
-    `Authorization: Basic ${credentials}`,
+  return report([
+    ["Header", `Authorization: Basic ${credentials}`, "accent"],
+    ["Credentials", credentials],
     "",
-    `curl -H 'Authorization: Basic ${credentials}' https://example.com`,
-    `curl -u '${username}:${password}' https://example.com`,
+    "Command line",
+    ["curl (header)", `curl -H 'Authorization: Basic ${credentials}' https://example.com`],
+    ["curl (short)", `curl -u '${username}:${password}' https://example.com`],
     "",
-    "Basic authentication only base64-encodes credentials — always send it over HTTPS.",
-  ].join("\n");
+    ["Note", "Basic authentication only base64-encodes credentials — always send it over HTTPS."],
+  ]);
 }
 
 export { bytesToHex, hexToBytes };

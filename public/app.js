@@ -29,8 +29,13 @@ const dom = {
   secondaryLabel: $("#secondaryLabel"),
   secondaryArea: $("#secondaryArea"),
   secondaryMeter: $("#secondaryMeter"),
+  outputPane: $("#outputPane"),
   outputArea: $("#outputArea"),
   outputMeter: $("#outputMeter"),
+  report: $("#report"),
+  cards: $("#cards"),
+  diff: $("#diff"),
+  rawButton: $("#rawButton"),
   preview: $("#preview"),
   previewButton: $("#previewButton"),
   swatches: $("#swatches"),
@@ -55,6 +60,10 @@ const state = {
   download: null,
   previewHtml: "",
   previewOpen: false,
+  rows: null,
+  cardValues: null,
+  diffLines: null,
+  rawOpen: false,
   commandIndex: 0,
   commandMatches: [],
   liveTimer: 0,
@@ -269,6 +278,8 @@ function openTool(id, { push = true, keepInput = false } = {}) {
   if (state.file) dom.fileChip.textContent = `${state.file.name} · ${formatBytes(state.file.size)} · held in memory only`;
 
   dom.outputArea.value = "";
+  state.rawOpen = false;
+  clearResultViews();
   dom.preview.hidden = true;
   dom.previewButton.hidden = true;
   dom.previewButton.setAttribute("aria-pressed", "false");
@@ -297,6 +308,8 @@ function runLabel() {
 function layoutPanes() {
   const panes = 1 + (dom.inputPane.hidden ? 0 : 1) + (dom.secondaryPane.hidden ? 0 : 1);
   dom.panes.dataset.panes = String(panes);
+  // With no input to show, every layout collapses to a full-width result.
+  dom.panes.dataset.layout = dom.inputPane.hidden ? "stack" : state.tool?.layout ?? "split";
 }
 
 function shouldAutoRun() {
@@ -337,6 +350,8 @@ async function run({ silent = false } = {}) {
     if (state.previewHtml && (payload.html || state.previewOpen)) setPreview(true);
     else setPreview(false);
 
+    renderResult(payload);
+
     if (payload.swatches?.length) {
       dom.swatches.hidden = false;
       dom.swatches.innerHTML = payload.swatches.slice(0, 24).map((value) => `<span class="swatch"><i style="background:${escapeHtml(value)}"></i>${escapeHtml(value)}</span>`).join("");
@@ -350,6 +365,7 @@ async function run({ silent = false } = {}) {
     dom.swatches.hidden = true;
     setPreview(false);
     dom.previewButton.hidden = true;
+    clearResultViews();
     // An automatic run over an empty box should not nag; a deliberate one should.
     if (silent && !dom.inputArea.value.trim() && !inputHidden(tool, state.action)) {
       dom.status.hidden = true;
@@ -369,12 +385,102 @@ function setStatus(message, tone) {
   dom.status.dataset.tone = tone;
 }
 
+/** Picks the richest view the result supports: rows, cards, or plain text. */
+function renderResult(payload) {
+  state.rows = payload.rows ?? null;
+  state.cardValues = cardValuesFor(payload);
+  state.diffLines = diffLinesFor(payload);
+
+  if (state.diffLines) {
+    dom.diff.innerHTML = state.diffLines.map(({ kind, text }) => `<div class="diff-line" data-kind="${kind}">${escapeHtml(text) || "&nbsp;"}</div>`).join("");
+  }
+  if (state.rows) {
+    dom.report.innerHTML = state.rows.map(renderReportRow).join("");
+    dom.cards.hidden = true;
+  } else if (state.cardValues) {
+    dom.cards.innerHTML = state.cardValues.map((value, index) => `
+      <button class="value-card" type="button" data-value="${escapeHtml(value)}">
+        <span class="index" aria-hidden="true">${index + 1}</span>
+        <code>${escapeHtml(value)}</code>
+        <span class="hint">Copy</span>
+      </button>`).join("");
+    dom.report.hidden = true;
+  }
+
+  const structured = Boolean(state.rows || state.cardValues || state.diffLines);
+  dom.rawButton.hidden = !structured;
+  dom.rawButton.setAttribute("aria-pressed", String(state.rawOpen));
+  applyResultView();
+}
+
+/** Splits a unified-style listing so additions and removals can be coloured. */
+function diffLinesFor(payload) {
+  if (!state.tool?.output.diff || payload.rows) return null;
+  const text = payload.text ?? "";
+  if (!text.trim() || text.split("\n").length > 4000) return null;
+  return text.split("\n").map((line) => {
+    if (/^\+ /.test(line)) return { kind: "add", text: line };
+    if (/^- /.test(line)) return { kind: "remove", text: line };
+    if (/^~ /.test(line)) return { kind: "change", text: line };
+    if (/^ {4}[+-] /.test(line)) return { kind: line.trimStart().startsWith("+") ? "add" : "remove", text: line };
+    return { kind: "same", text: line };
+  });
+}
+
+function cardValuesFor(payload) {
+  if (!state.tool?.cards || payload.rows) return null;
+  const lines = (payload.text ?? "").split("\n").filter((line) => line.trim());
+  if (!lines.length || lines.length > 200) return null;
+  return lines.every((line) => line.length <= 96) ? lines : null;
+}
+
+function renderReportRow(row) {
+  if (row.type === "blank") return "";
+  if (row.type === "heading") return `<div class="report-heading">${escapeHtml(row.label)}</div>`;
+  const tone = row.tone ? ` data-tone="${escapeHtml(row.tone)}"` : "";
+  return `<div class="report-row"${tone}>
+    <dt>${escapeHtml(row.label)}</dt>
+    <dd><span>${escapeHtml(row.value)}</span><button class="copy-value" type="button" data-value="${escapeHtml(row.value)}">Copy</button></dd>
+  </div>`;
+}
+
+function clearResultViews() {
+  state.rows = null;
+  state.cardValues = null;
+  state.diffLines = null;
+  dom.report.hidden = true;
+  dom.report.innerHTML = "";
+  dom.cards.hidden = true;
+  dom.cards.innerHTML = "";
+  dom.diff.hidden = true;
+  dom.diff.innerHTML = "";
+  dom.rawButton.hidden = true;
+  dom.outputArea.hidden = false;
+}
+
+/** Shows exactly one of: preview, report, cards, or the raw text box. */
+function applyResultView() {
+  const plain = state.rawOpen;
+  const previewReady = Boolean(state.previewHtml) && state.previewOpen;
+  // A visual tool can show its picture and its numbers at the same time.
+  const paired = !plain && previewReady && Boolean(state.rows) && state.tool?.layout === "canvas";
+  const showPreview = !plain && previewReady;
+  const showReport = !plain && Boolean(state.rows) && (paired || !showPreview);
+  const showCards = !plain && !showPreview && !showReport && Boolean(state.cardValues);
+  const showDiff = !plain && !showPreview && !showReport && !showCards && Boolean(state.diffLines);
+  dom.preview.hidden = !showPreview;
+  dom.report.hidden = !showReport;
+  dom.cards.hidden = !showCards;
+  dom.diff.hidden = !showDiff;
+  dom.outputArea.hidden = showPreview || showReport || showCards || showDiff;
+  dom.outputPane.dataset.view = paired ? "paired" : "single";
+}
+
 function setPreview(open) {
   state.previewOpen = open && Boolean(state.previewHtml);
-  dom.preview.hidden = !state.previewOpen;
-  dom.outputArea.hidden = state.previewOpen;
   dom.previewButton.setAttribute("aria-pressed", String(state.previewOpen));
   if (state.previewOpen) dom.preview.innerHTML = sanitize(state.previewHtml);
+  applyResultView();
 }
 
 /** Renders generated markup for preview with scripts and event handlers removed. */
@@ -618,6 +724,35 @@ $("#downloadButton").addEventListener("click", () => {
   toast(`Saving ${name}`);
 });
 dom.previewButton.addEventListener("click", () => setPreview(!state.previewOpen));
+dom.rawButton.addEventListener("click", () => {
+  state.rawOpen = !state.rawOpen;
+  dom.rawButton.setAttribute("aria-pressed", String(state.rawOpen));
+  applyResultView();
+});
+
+dom.outputPane.addEventListener("click", async (event) => {
+  const trigger = event.target.closest("[data-value]");
+  if (!trigger) return;
+  await copyValue(trigger.dataset.value);
+  if (trigger.classList.contains("value-card")) {
+    trigger.classList.add("copied");
+    trigger.querySelector(".hint").textContent = "Copied";
+    setTimeout(() => {
+      trigger.classList.remove("copied");
+      const hint = trigger.querySelector(".hint");
+      if (hint) hint.textContent = "Copy";
+    }, 1400);
+  }
+});
+
+async function copyValue(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("Copied");
+  } catch {
+    toast("This browser blocked copying — select the value instead");
+  }
+}
 
 dom.fileInput.addEventListener("change", (event) => acceptFile(event.target.files[0]));
 

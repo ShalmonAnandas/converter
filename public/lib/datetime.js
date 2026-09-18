@@ -1,5 +1,7 @@
 // Date, time, duration, and cron utilities.
 
+import { report } from "./report.js";
+
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -50,9 +52,7 @@ export function describeMoment(input, unit = "auto", timeZone = "UTC") {
   } catch {
     zoneRow = [["", ""], [`In ${timeZone}`, "That time zone is not available in this browser"]];
   }
-  const all = [...rows, ...zoneRow];
-  const width = Math.max(...all.filter(([label]) => label).map(([label]) => label.length));
-  return all.map(([label, value]) => (label ? `${label.padEnd(width)}  ${value}` : "")).join("\n");
+  return report([...rows, ...zoneRow]);
 }
 
 export function formatMoment(input, unit, pattern) {
@@ -131,8 +131,7 @@ export function dateDifference(from, to) {
     ["Milliseconds", String(Math.abs(delta))],
     ["Business days", String(businessDays(start, end))],
   ];
-  const width = Math.max(...rows.filter(([label]) => label).map(([label]) => label.length));
-  return rows.map(([label, value]) => (label ? `${label.padEnd(width)}  ${value}` : "")).join("\n");
+  return report(rows);
 }
 
 function businessDays(start, end) {
@@ -160,8 +159,7 @@ export function convertDuration(input, from = "seconds") {
   rows.push(["human readable", humanizeDuration(parsed)]);
   rows.push(["ISO 8601", isoDuration(parsed)]);
   rows.push(["clock", clockDuration(parsed)]);
-  const width = Math.max(...rows.filter(([label]) => label).map(([label]) => label.length));
-  return rows.map(([label, value]) => (label ? `${label.padEnd(width)}  ${value}` : "")).join("\n");
+  return report(rows);
 }
 
 export function parseDuration(input, from = "seconds") {
@@ -292,19 +290,19 @@ export function describeCron(expression, { runs = 5, from = new Date() } = {}) {
   const fields = parseCron(expression);
   const listing = fields.map(({ field, raw, values }) => {
     const summary = values.length > 12 ? `${values.length} values (${values[0]}–${values.at(-1)})` : values.join(", ");
-    return `${field.name.padEnd(13)} ${raw.padEnd(12)} ${summary}`;
+    return [field.name, `${raw.padEnd(10)} ${summary}`];
   });
   const next = nextCronRuns(fields, from, runs);
-  return [
-    `Expression     ${expression.trim()}`,
-    `Summary        ${summarizeCron(fields)}`,
+  return report([
+    ["Expression", expression.trim(), "accent"],
+    ["Summary", summarizeCron(fields)],
     "",
-    "Field         Pattern      Matches",
+    "Fields",
     ...listing,
     "",
     `Next ${next.length} run${next.length === 1 ? "" : "s"} (UTC)`,
-    ...next.map((date) => `  ${date.toISOString().replace(".000Z", "Z")}  ${DAYS[date.getUTCDay()]}`),
-  ].join("\n");
+    ...next.map((date) => [DAYS[date.getUTCDay()], date.toISOString().replace(".000Z", "Z")]),
+  ]);
 }
 
 function summarizeCron(fields) {
