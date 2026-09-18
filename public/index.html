@@ -1,54 +1,166 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="A private, local-first workbench for developer data.">
-  <title>Converter — Developer tools, one workspace</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="A local-first workbench with 92 developer tools: JSON, YAML, TOML, XML, CSV, Base64, hashing, JWT, QR codes, colour, networking, dates, and Office documents. Nothing you paste leaves your browser.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0e0f14">
+  <title>Converter — 92 developer tools, one workspace</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#workspace">Skip to the workspace</a>
+
   <header class="topbar">
-    <a class="brand" href="#" aria-label="Converter home"><span class="brand-mark">C</span><span>Converter</span></a>
-    <button class="command-search" id="commandButton"><span>⌕</span><span>Search tools and actions...</span><kbd>⌘ K</kbd></button>
-    <nav class="top-actions" aria-label="Global actions"><button class="icon-button" id="themeButton" aria-label="Toggle theme">☼</button><a class="github" href="https://github.com" aria-label="GitHub">⌁</a></nav>
+    <button class="menu-button" id="menuButton" aria-label="Show the tool list" aria-expanded="false" aria-controls="sidebar">
+      <span aria-hidden="true">☰</span>
+    </button>
+
+    <a class="brand" href="#/">
+      <span class="brand-mark" aria-hidden="true">C</span>
+      <span class="brand-text">Converter</span>
+    </a>
+
+    <button class="command-trigger" id="commandButton" aria-label="Search all tools, keyboard shortcut Control or Command K">
+      <span class="command-trigger-icon" aria-hidden="true">⌕</span>
+      <span class="command-trigger-label">Search 92 tools…</span>
+      <kbd id="commandHint">Ctrl K</kbd>
+    </button>
+
+    <nav class="top-actions" aria-label="Global actions">
+      <button class="icon-button" id="themeButton" aria-label="Switch between light and dark themes">
+        <span aria-hidden="true" id="themeIcon">◑</span>
+      </button>
+      <a class="icon-button" id="repoLink" href="https://github.com/ShalmonAnandas/converter" rel="noreferrer noopener" aria-label="Open the source repository">
+        <span aria-hidden="true">◧</span>
+      </a>
+    </nav>
   </header>
 
-  <div class="app-shell">
-    <aside class="sidebar">
-      <nav id="toolNav" aria-label="Tools"></nav>
-      <div class="sidebar-card"><span class="pulse-dot"></span><div><strong>Private by default</strong><p>Your data stays in this browser.</p></div></div>
-      <div class="sidebar-footer"><button id="shortcutsButton">⌨ Keyboard shortcuts</button><span>v0.1.0</span></div>
+  <div class="layout">
+    <div class="scrim" id="scrim" hidden></div>
+
+    <aside class="sidebar" id="sidebar" aria-label="Tool catalogue">
+      <div class="sidebar-search">
+        <span aria-hidden="true">⌕</span>
+        <input id="sidebarFilter" type="search" placeholder="Filter tools" aria-label="Filter the tool list" autocomplete="off">
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav"></nav>
+      <div class="sidebar-foot">
+        <span class="pulse" aria-hidden="true"></span>
+        <div>
+          <strong>Everything runs here</strong>
+          <p>No uploads, no accounts, no telemetry.</p>
+        </div>
+      </div>
     </aside>
 
-    <main>
-      <section class="hero">
-        <div class="eyebrow"><span></span> LOCAL-FIRST DEVELOPER TOOLKIT</div>
-        <h1>Convert anything.<br><em>Keep everything private.</em></h1>
-        <p>A fast, precise workbench for the formats developers use every day. Your files never leave your browser.</p>
-        <div class="hero-pills"><span>✣ No uploads</span><span>ϟ Instant processing</span><span>◇ Open source</span></div>
-      </section>
-
-      <section class="registry-section">
-        <div class="section-heading"><div><h2>Choose a tool</h2><p>Everything you need, exactly where you expect it.</p></div><label class="filter"><span>⌕</span><input id="filterInput" placeholder="Filter tools..." aria-label="Filter tools"></label></div>
-        <div id="toolGrid" class="tool-grid"></div>
-      </section>
-
-      <section class="workbench hidden" id="workbench" aria-labelledby="workbenchTitle">
-        <div class="workbench-header"><div class="workbench-icon" id="workbenchIcon">{ }</div><div><span class="local-badge">● LOCAL PROCESSING</span><h2 id="workbenchTitle">JSON Formatter</h2><p id="workbenchDescription"></p></div><button id="closeWorkbench" class="icon-button" aria-label="Close tool">×</button></div>
-        <div class="options" id="options"></div>
-        <div class="editor-grid">
-          <div class="editor-panel"><div class="editor-top"><label for="inputEditor">INPUT</label><span id="inputSize">0 B</span></div><textarea id="inputEditor" spellcheck="false" placeholder="Paste your data here..." aria-describedby="diagnostic"></textarea></div>
-          <div class="editor-panel"><div class="editor-top"><label for="outputEditor">OUTPUT</label><span id="outputSize">0 B</span></div><textarea id="outputEditor" spellcheck="false" readonly placeholder="Your result will appear here..."></textarea></div>
+    <main id="workspace">
+      <section class="home" id="home">
+        <div class="hero">
+          <p class="eyebrow">Local-first developer toolkit</p>
+          <h1>Convert anything.<br><em>Keep everything private.</em></h1>
+          <p class="hero-lead">Ninety-two working tools for the formats you touch every day — data, text, encoding, crypto, colour, networking, dates, and Office documents. Every byte is processed in this tab.</p>
+          <div class="hero-actions">
+            <button class="button primary large" id="heroBrowse">Browse the catalogue</button>
+            <button class="button ghost large" id="heroSearch">Search tools <kbd id="heroHint">Ctrl K</kbd></button>
+          </div>
+          <ul class="hero-facts">
+            <li><strong>92</strong> tools</li>
+            <li><strong>0</strong> bytes uploaded</li>
+            <li><strong>0</strong> dependencies</li>
+          </ul>
         </div>
-        <div class="diagnostic hidden" id="diagnostic" role="status"></div>
-        <div class="workbench-actions"><button class="secondary" id="resetButton">Reset</button><div><button class="secondary" id="downloadButton">Download</button><button class="secondary" id="copyButton">Copy output</button><button class="primary" id="runButton">Format JSON <span>→</span></button></div></div>
+
+        <div class="catalogue" id="catalogue"></div>
+      </section>
+
+      <section class="workbench" id="workbench" hidden aria-labelledby="toolTitle">
+        <header class="workbench-head">
+          <span class="tool-icon" id="toolIcon" aria-hidden="true">{ }</span>
+          <div class="workbench-title">
+            <span class="badge">Local processing</span>
+            <h1 id="toolTitle">Tool</h1>
+            <p id="toolBlurb"></p>
+          </div>
+          <button class="icon-button" id="closeTool" aria-label="Close this tool and return to the catalogue">
+            <span aria-hidden="true">✕</span>
+          </button>
+        </header>
+
+        <div class="controls">
+          <div class="action-bar" id="actionBar" role="group" aria-label="Choose what this tool does"></div>
+          <div class="field-bar" id="fieldBar"></div>
+        </div>
+
+        <div class="panes" id="panes">
+          <section class="pane" id="inputPane">
+            <div class="pane-head">
+              <label class="pane-label" id="inputLabel" for="inputArea">Input</label>
+              <div class="pane-tools">
+                <span class="meter" id="inputMeter">0 B</span>
+                <label class="button tiny file-button" id="fileButton" hidden>
+                  Open file
+                  <input type="file" id="fileInput" hidden>
+                </label>
+                <button class="button tiny" id="pasteButton">Paste</button>
+                <button class="button tiny" id="clearButton">Clear</button>
+              </div>
+            </div>
+            <textarea id="inputArea" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+            <p class="file-chip" id="fileChip" hidden></p>
+          </section>
+
+          <section class="pane" id="secondaryPane" hidden>
+            <div class="pane-head">
+              <label class="pane-label" id="secondaryLabel" for="secondaryArea">Compare with</label>
+              <span class="meter" id="secondaryMeter">0 B</span>
+            </div>
+            <textarea id="secondaryArea" spellcheck="false" autocomplete="off"></textarea>
+          </section>
+
+          <section class="pane" id="outputPane">
+            <div class="pane-head">
+              <label class="pane-label" for="outputArea">Output</label>
+              <div class="pane-tools">
+                <span class="meter" id="outputMeter">0 B</span>
+                <button class="button tiny" id="previewButton" hidden aria-pressed="false">Preview</button>
+                <button class="button tiny" id="copyButton">Copy</button>
+                <button class="button tiny" id="downloadButton">Download</button>
+              </div>
+            </div>
+            <textarea id="outputArea" spellcheck="false" readonly placeholder="Results appear here."></textarea>
+            <div class="preview" id="preview" hidden></div>
+            <div class="swatches" id="swatches" hidden></div>
+          </section>
+        </div>
+
+        <p class="status" id="status" role="status" aria-live="polite" hidden></p>
+
+        <footer class="workbench-foot">
+          <button class="button ghost" id="resetButton">Reset</button>
+          <div class="workbench-foot-right">
+            <button class="button ghost" id="swapButton" title="Move the output into the input">Swap ⇅</button>
+            <button class="button primary large" id="runButton">Run<span aria-hidden="true"> →</span></button>
+          </div>
+        </footer>
       </section>
     </main>
   </div>
 
-  <dialog id="commandDialog" aria-label="Tool command palette"><div class="dialog-search"><span>⌕</span><input id="commandInput" aria-label="Search every tool" placeholder="Search every tool..." autocomplete="off"><kbd>ESC</kbd></div><div id="commandResults"></div></dialog>
-  <div class="toast" id="toast" role="status"></div>
+  <dialog id="commandDialog" aria-label="Search every tool">
+    <div class="command-head">
+      <span aria-hidden="true">⌕</span>
+      <input id="commandInput" type="search" placeholder="Search every tool…" aria-label="Search every tool" autocomplete="off">
+      <kbd>Esc</kbd>
+    </div>
+    <div class="command-results" id="commandResults" role="listbox" aria-label="Search results"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>

@@ -1,92 +1,712 @@
-import { formatBytes, jsonTransform, jsonError, encodeBase64, decodeBase64, normalizeBase64, validateBase64, parseDataUri, convertTimestamp } from "./core.js";
-import { parseCsv, detectDelimiter, inspectJwt, generateHash, formatXml, minifyXml } from "./tools.js";
-import { csvRowsToXlsx, xlsxToCsv, markdownToDocx, docxToMarkdown } from "./office.js";
+// The interface. Everything it renders comes from the registry, so this file
+// knows about controls and layout but never about individual tools.
 
-const tools = [
-  { category:"STRUCTURED DATA", id:"json", icon:"{ }", name:"JSON Formatter", description:"Format, validate, minify, and sort JSON with precise diagnostics.", available:true },
-  { category:"STRUCTURED DATA", id:"xml", icon:"</>", name:"XML Toolkit", description:"Format, minify, and validate XML with external entities disabled.", available:true },
-  { category:"BASE64 & BINARY", id:"base64", icon:"64", name:"Base64 Studio", description:"Encode, decode, normalize, and validate text or binary payloads.", available:true },
-  { category:"FILES", id:"spreadsheet", icon:"▦", name:"Spreadsheet", description:"Convert CSV to standards-compliant XLSX workbooks and XLSX sheets back to CSV.", available:true },
-  { category:"DOCUMENTS", id:"documents", icon:"▤", name:"Document Converter", description:"Convert Markdown to Word DOCX and extract clean Markdown from DOCX files.", available:true },
-  { category:"ENCODING", id:"url", icon:"%", name:"URL Encoder", description:"Percent-encode or decode URL components without sending data.", available:true },
-  { category:"INSPECTORS", id:"timestamp", icon:"◷", name:"Timestamp", description:"Convert Unix seconds or milliseconds into precise ISO dates.", available:true },
-  { category:"INSPECTORS", id:"jwt", icon:"•••", name:"JWT Inspector", description:"Inspect token headers, claims, and timestamps without implying verification.", available:true },
-  { category:"GENERATORS", id:"hash", icon:"#", name:"Hash Generator", description:"Create SHA-256 and SHA-512 digests with Web Crypto.", available:true }
-];
-const configurations = {
-  json:{ description:"Format, minify, validate, and recursively sort JSON.", sample:'{"project":"converter","private":true,"features":["format","validate","sort"]}', actions:["format","minify","sort"], actionLabel:"Format JSON" },
-  base64:{ description:"Byte-correct UTF-8 Base64, Base64URL, validation, normalization, and Data URI inspection.", sample:"Private by default. Fast by design.", actions:["encode","decode","validate","normalize","parse data uri"], actionLabel:"Encode Base64" },
-  url:{ description:"Encode and decode URL components locally in your browser.", sample:"https://example.com/search?q=local tools&sort=new", actions:["encode","decode"], actionLabel:"Encode URL" },
-  timestamp:{ description:"Convert Unix timestamps into ISO 8601 UTC values.", sample:String(Math.floor(Date.now()/1000)), actions:["convert"], actionLabel:"Convert timestamp" }
-  ,xml:{ description:"Pretty-print, minify, or validate well-formed XML. DOCTYPE is rejected for safety.", sample:'<catalog><item id="1"><name>Local tools</name></item></catalog>', actions:["format","minify","validate"], actionLabel:"Format XML" }
-  ,spreadsheet:{ description:"Create a real XLSX workbook from CSV or extract the first XLSX worksheet as CSV.", sample:'name,role,active\nAda,Engineer,true\nLin,QA,true', actions:["csv to xlsx","xlsx to csv"], actionLabel:"Convert spreadsheet" }
-  ,documents:{ description:"Generate a Word-compatible DOCX or extract headings and paragraphs from DOCX as Markdown.", sample:'# Release notes\n\n**Converter** keeps your content local.\n\n- Private\n- Fast\n- Downloadable', actions:["markdown to docx","docx to markdown"], actionLabel:"Convert document" }
-  ,jwt:{ description:"Decode JWT header and payload locally. Decoding never verifies authenticity.", sample:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkYSIsImlhdCI6MTUxNjIzOTAyMn0.signature", actions:["inspect"], actionLabel:"Inspect JWT" }
-  ,hash:{ description:"Generate cryptographic SHA-256 or SHA-512 hashes through Web Crypto.", sample:"Hash this text locally", actions:["generate"], actionLabel:"Generate hash" }
-};
+import { TOOLS, TOOL_CATEGORIES, TOOLS_BY_ID, searchTools, dependentOptions } from "./registry.js";
+import { formatBytes } from "./lib/bytes.js";
+
 const $ = (selector) => document.querySelector(selector);
-const nav = $("#toolNav"), grid = $("#toolGrid"), dialog = $("#commandDialog");
-let activeTool = "json";
-let activeFile = null;
-let pendingDownload = null;
 
-function renderNav(){ let category=""; nav.innerHTML=tools.map(tool=>{const heading=tool.category!==category?`<div class="nav-title">${(category=tool.category)}</div>`:"";return `${heading}<button class="nav-item" data-tool="${tool.id}"><span class="nav-icon">${tool.icon}</span>${tool.name}${tool.available?"":'<span class="soon">SOON</span>'}</button>`}).join(""); }
-function renderGrid(filter=""){ const matches=tools.filter(t=>(t.name+t.description+t.category).toLowerCase().includes(filter.toLowerCase())); grid.innerHTML=matches.map(t=>`<button class="tool-card ${t.available?"available":""}" data-tool="${t.id}"><span class="tool-card-icon">${t.icon}</span><span class="card-arrow">↗</span><h3>${t.name}</h3><p>${t.description}</p><span class="card-tag">${t.available?"READY":"COMING SOON"}</span></button>`).join("") || `<p>No tools match “${filter}”.</p>`; }
-function openTool(id){ const tool=tools.find(t=>t.id===id); if(!tool.available){ toast(`${tool.name} is on the delivery roadmap`); return; } activeTool=id; activeFile=null; pendingDownload=null; const config=configurations[id]; $("#workbenchIcon").textContent=tool.icon;$("#workbenchTitle").textContent=tool.name;$("#workbenchDescription").textContent=config.description;$("#inputEditor").value=config.sample;$("#outputEditor").value="";$("#diagnostic").classList.add("hidden"); renderOptions(config); updateSizes(); $("#workbench").classList.remove("hidden"); document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.tool===id)); $("#workbench").scrollIntoView({behavior:"smooth",block:"start"}); }
-function renderOptions(config) {
-  const accepts = activeTool === "spreadsheet" ? ".csv,.xlsx,text/csv" : activeTool === "documents" ? ".md,.markdown,.docx,text/markdown,text/plain" : activeTool === "xml" ? ".xml,text/xml,application/xml" : "";
-  const actionButtons = config.actions.map((action, index) => `<button type="button" class="action-choice${index === 0 ? " selected" : ""}" data-action="${action}">${action.replace(/\b\w/g, letter => letter.toUpperCase())}</button>`).join("");
-  $("#options").innerHTML = `<div class="action-group" role="group" aria-label="Conversion action"><input id="actionSelect" type="hidden" value="${config.actions[0]}">${actionButtons}</div>`
-    + (activeTool === "json" ? `<label class="option-group">INDENT <select id="indentSelect"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="tab">Tab</option></select></label>` : activeTool === "base64" ? `<label class="option-group">VARIANT <select id="variantSelect"><option value="standard">Standard</option><option value="url">Base64URL</option></select></label>` : activeTool === "timestamp" ? `<label class="option-group">UNIT <select id="unitSelect"><option value="seconds">Seconds</option><option value="milliseconds">Milliseconds</option></select></label>` : activeTool === "hash" ? `<label class="option-group">ALGORITHM <select id="algorithmSelect"><option>SHA-256</option><option>SHA-512</option></select></label>` : "")
-    + (accepts ? `<label class="file-button">Open file<input id="fileInput" type="file" accept="${accepts}"></label>` : "");
-  document.querySelectorAll(".action-choice").forEach(button => button.addEventListener("click", () => {
-    $("#actionSelect").value = button.dataset.action;
-    document.querySelectorAll(".action-choice").forEach(choice => choice.classList.toggle("selected", choice === button));
-    $("#runButton").firstChild.textContent = `${button.textContent} `;
-  }));
-  $("#fileInput")?.addEventListener("change", async event => {
-    const file = event.target.files[0]; if (!file) return;
-    if (file.size > 25 * 1024 * 1024) return showDiagnostic("Files larger than 25 MB are not opened to protect browser memory.", false);
-    activeFile = { name: file.name, buffer: await file.arrayBuffer() };
-    if (!/\.(xlsx|docx)$/i.test(file.name)) $("#inputEditor").value = new TextDecoder().decode(activeFile.buffer);
-    else $("#inputEditor").value = `${file.name} loaded (${formatBytes(file.size)}). Choose the matching conversion action.`;
-    updateSizes(); toast(`${file.name} loaded locally`);
+const dom = {
+  sidebar: $("#sidebar"),
+  sidebarNav: $("#sidebarNav"),
+  sidebarFilter: $("#sidebarFilter"),
+  scrim: $("#scrim"),
+  menuButton: $("#menuButton"),
+  home: $("#home"),
+  catalogue: $("#catalogue"),
+  workbench: $("#workbench"),
+  toolIcon: $("#toolIcon"),
+  toolTitle: $("#toolTitle"),
+  toolBlurb: $("#toolBlurb"),
+  actionBar: $("#actionBar"),
+  fieldBar: $("#fieldBar"),
+  panes: $("#panes"),
+  inputPane: $("#inputPane"),
+  inputLabel: $("#inputLabel"),
+  inputArea: $("#inputArea"),
+  inputMeter: $("#inputMeter"),
+  secondaryPane: $("#secondaryPane"),
+  secondaryLabel: $("#secondaryLabel"),
+  secondaryArea: $("#secondaryArea"),
+  secondaryMeter: $("#secondaryMeter"),
+  outputArea: $("#outputArea"),
+  outputMeter: $("#outputMeter"),
+  preview: $("#preview"),
+  previewButton: $("#previewButton"),
+  swatches: $("#swatches"),
+  status: $("#status"),
+  fileButton: $("#fileButton"),
+  fileInput: $("#fileInput"),
+  fileChip: $("#fileChip"),
+  runButton: $("#runButton"),
+  dialog: $("#commandDialog"),
+  commandInput: $("#commandInput"),
+  commandResults: $("#commandResults"),
+  toast: $("#toast"),
+};
+
+const MAX_FILE_BYTES = 64 * 1024 * 1024;
+
+const state = {
+  tool: null,
+  action: null,
+  options: {},
+  file: null,
+  download: null,
+  previewHtml: "",
+  previewOpen: false,
+  commandIndex: 0,
+  commandMatches: [],
+  liveTimer: 0,
+  running: false,
+};
+
+/* ------------------------------------------------------------- utilities */
+
+function escapeHtml(value) {
+  return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function toast(message) {
+  dom.toast.textContent = message;
+  dom.toast.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => dom.toast.classList.remove("show"), 2200);
+}
+
+function byteSize(value) {
+  return formatBytes(new TextEncoder().encode(value).length);
+}
+
+const isApple = typeof navigator !== "undefined" && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || "");
+
+/* --------------------------------------------------------------- sidebar */
+
+function renderSidebar(filter = "") {
+  const matches = filter ? new Set(searchTools(filter).map((tool) => tool.id)) : null;
+  const open = new Set([...dom.sidebarNav.querySelectorAll('.nav-group[data-open="true"]')].map((group) => group.dataset.category));
+  const fragments = [];
+
+  for (const category of TOOL_CATEGORIES) {
+    const tools = TOOLS.filter((tool) => tool.category === category && (!matches || matches.has(tool.id)));
+    if (!tools.length) continue;
+    const expanded = filter ? true : open.size ? open.has(category) : tools.some((tool) => tool.id === state.tool?.id) || category === TOOL_CATEGORIES[0];
+    fragments.push(`
+      <div class="nav-group" data-category="${escapeHtml(category)}" data-open="${expanded}">
+        <button class="nav-group-head" type="button" aria-expanded="${expanded}">
+          <span class="caret" aria-hidden="true">▾</span>
+          ${escapeHtml(category)}
+          <span class="nav-group-count">${tools.length}</span>
+        </button>
+        <div class="nav-list">
+          ${tools.map((tool) => `
+            <button class="nav-item" type="button" data-tool="${tool.id}" ${state.tool?.id === tool.id ? 'aria-current="true"' : ""}>
+              <span class="nav-icon" aria-hidden="true">${escapeHtml(tool.icon)}</span>
+              <span>${escapeHtml(tool.name)}</span>
+            </button>`).join("")}
+        </div>
+      </div>`);
+  }
+  dom.sidebarNav.innerHTML = fragments.join("") || '<p class="empty">No tools match that filter.</p>';
+}
+
+function renderCatalogue(filter = "") {
+  const visible = filter ? searchTools(filter) : TOOLS;
+  if (!visible.length) {
+    dom.catalogue.innerHTML = `<p class="empty">Nothing matches “${escapeHtml(filter)}”. Try a format name such as <strong>yaml</strong>, <strong>base64</strong>, or <strong>cron</strong>.</p>`;
+    return;
+  }
+  const sections = TOOL_CATEGORIES.map((category) => {
+    const tools = visible.filter((tool) => tool.category === category);
+    if (!tools.length) return "";
+    return `
+      <section class="category">
+        <div class="category-head">
+          <h2>${escapeHtml(category)}</h2>
+          <span>${tools.length} tool${tools.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="tool-grid">
+          ${tools.map((tool) => `
+            <button class="tool-card" type="button" data-tool="${tool.id}">
+              <span class="tool-icon" aria-hidden="true">${escapeHtml(tool.icon)}</span>
+              <h3>${escapeHtml(tool.name)}</h3>
+              <p>${escapeHtml(tool.blurb)}</p>
+              <span class="tool-tags">${(tool.actions.length ? tool.actions : tool.keywords ?? []).slice(0, 3).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</span>
+            </button>`).join("")}
+        </div>
+      </section>`;
   });
-  $("#runButton").firstChild.textContent = `${config.actionLabel} `;
+  dom.catalogue.innerHTML = sections.join("");
 }
-async function run() {
-  const input = $("#inputEditor").value, action = $("#actionSelect").value, start = performance.now();
-  try {
-    let output = "", detail = ""; pendingDownload = null;
-    if (activeTool === "json") output = jsonTransform(input, action, $("#indentSelect").value);
-    if (activeTool === "base64") { const urlSafe = $("#variantSelect").value === "url"; if (action === "encode") output = encodeBase64(input, urlSafe); if (action === "decode") output = decodeBase64(input); if (action === "normalize") output = normalizeBase64(input, urlSafe); if (action === "validate") output = JSON.stringify(validateBase64(input), null, 2); if (action === "parse data uri") output = JSON.stringify(parseDataUri(input), null, 2); }
-    if (activeTool === "url") output = action === "encode" ? encodeURIComponent(input) : decodeURIComponent(input);
-    if (activeTool === "timestamp") output = convertTimestamp(input, $("#unitSelect").value);
-    if (activeTool === "xml") { if (action === "minify") output = minifyXml(input); else { const formatted = formatXml(input); output = action === "validate" ? `Valid XML document\nRoot element: ${new DOMParser().parseFromString(input, "application/xml").documentElement.nodeName}` : formatted; } }
-    if (activeTool === "spreadsheet") {
-      if (action === "csv to xlsx") { const source = activeFile && /\.csv$/i.test(activeFile.name) ? new TextDecoder().decode(activeFile.buffer) : input; const rows = parseCsv(source, detectDelimiter(source)); const bytes = csvRowsToXlsx(rows); pendingDownload = { blob: new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name: "converter.xlsx" }; output = `XLSX workbook ready\n${rows.length} rows × ${Math.max(0, ...rows.map(row => row.length))} columns\nUse Download to save the workbook.`; }
-      else { if (!activeFile || !/\.xlsx$/i.test(activeFile.name)) throw new Error("Open an .xlsx file before converting to CSV"); output = await xlsxToCsv(activeFile.buffer); pendingDownload = { blob: new Blob([output], { type: "text/csv;charset=utf-8" }), name: activeFile.name.replace(/\.xlsx$/i, ".csv") }; }
-    }
-    if (activeTool === "documents") {
-      if (action === "markdown to docx") { const source = activeFile && /\.(md|markdown)$/i.test(activeFile.name) ? new TextDecoder().decode(activeFile.buffer) : input; const bytes = markdownToDocx(source); pendingDownload = { blob: new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), name: "converter.docx" }; output = "Word-compatible DOCX ready. Use Download to save the document."; }
-      else { if (!activeFile || !/\.docx$/i.test(activeFile.name)) throw new Error("Open a .docx file before converting to Markdown"); output = await docxToMarkdown(activeFile.buffer); pendingDownload = { blob: new Blob([output], { type: "text/markdown;charset=utf-8" }), name: activeFile.name.replace(/\.docx$/i, ".md") }; }
-    }
-    if (activeTool === "jwt") output = JSON.stringify(inspectJwt(input), null, 2);
-    if (activeTool === "hash") output = await generateHash(input, $("#algorithmSelect").value);
-    $("#outputEditor").value = output; showDiagnostic(`✓ Completed locally in ${(performance.now() - start).toFixed(1)} ms${detail}`, true);
-  } catch (error) { $("#outputEditor").value = ""; showDiagnostic(activeTool === "json" ? jsonError(error, input) : error.message, false); }
-  updateSizes();
-}
-function showDiagnostic(message,success){ const el=$("#diagnostic");el.textContent=message;el.classList.remove("hidden");el.classList.toggle("success",success); }
-function updateSizes(){ $("#inputSize").textContent=formatBytes(new Blob([$("#inputEditor").value]).size);$("#outputSize").textContent=formatBytes(new Blob([$("#outputEditor").value]).size); }
-function toast(message){const el=$("#toast");el.textContent=message;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),1800)}
-function renderCommands(filter=""){const matches=tools.filter(t=>t.name.toLowerCase().includes(filter.toLowerCase()));$("#commandResults").innerHTML=matches.map(t=>`<button class="command-result" data-tool="${t.id}"><span class="tool-card-icon">${t.icon}</span><span><strong>${t.name}</strong><small>${t.category} · ${t.available?"Local processing":"Coming soon"}</small></span></button>`).join("");}
-function openCommands(){renderCommands();dialog.showModal();$("#commandInput").value="";$("#commandInput").focus()}
 
-renderNav();renderGrid();
-document.addEventListener("click",e=>{const target=e.target.closest("[data-tool]");if(target){if(dialog.open) dialog.close();openTool(target.dataset.tool)}});
-$("#filterInput").addEventListener("input",e=>renderGrid(e.target.value));$("#commandInput").addEventListener("input",e=>renderCommands(e.target.value));$("#commandButton").addEventListener("click",openCommands);$("#shortcutsButton").addEventListener("click",openCommands);
-document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCommands()}if(e.key==="Escape"&&dialog.open)dialog.close()});
-$("#themeButton").addEventListener("click",()=>{const html=document.documentElement;html.dataset.theme=html.dataset.theme==="dark"?"light":"dark";localStorage.setItem("theme",html.dataset.theme)});document.documentElement.dataset.theme=localStorage.getItem("theme")||"dark";
-$("#runButton").addEventListener("click",run);$("#inputEditor").addEventListener("input",updateSizes);$("#resetButton").addEventListener("click",()=>openTool(activeTool));$("#closeWorkbench").addEventListener("click",()=>$("#workbench").classList.add("hidden"));$("#copyButton").addEventListener("click",async()=>{if(!$("#outputEditor").value)return toast("Nothing to copy yet");await navigator.clipboard.writeText($("#outputEditor").value);toast("Output copied")});
-$("#downloadButton").addEventListener("click",()=>{const output=$("#outputEditor").value;if(!output&&!pendingDownload)return toast("Nothing to download yet");const blob=pendingDownload?.blob||new Blob([output],{type:"text/plain;charset=utf-8"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=pendingDownload?.name||`converter-${activeTool}-output.txt`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),0);toast("Download started")});
+/* -------------------------------------------------------------- controls */
+
+function visibleFields() {
+  if (!state.tool) return [];
+  return state.tool.fields.filter((field) => !field.when || field.when.includes(state.action));
+}
+
+function renderActions() {
+  const tool = state.tool;
+  if (!tool.actions.length) {
+    dom.actionBar.innerHTML = "";
+    dom.actionBar.hidden = true;
+    return;
+  }
+  dom.actionBar.hidden = false;
+  dom.actionBar.innerHTML = tool.actions.map((action) => `
+    <button class="action-pill" type="button" data-action="${escapeHtml(action)}" aria-pressed="${action === state.action}">
+      ${escapeHtml(action.replace(/^\w/, (letter) => letter.toUpperCase()))}
+    </button>`).join("");
+}
+
+function renderFields() {
+  const fields = visibleFields();
+  dom.fieldBar.hidden = fields.length === 0;
+  dom.fieldBar.innerHTML = fields.map((field) => {
+    const value = state.options[field.id];
+    const id = `field-${field.id}`;
+    if (field.type === "toggle") {
+      return `<label class="field field-toggle" for="${id}">
+        <input type="checkbox" id="${id}" data-field="${field.id}"${value ? " checked" : ""}>
+        <span>${escapeHtml(field.label)}</span>
+      </label>`;
+    }
+    if (field.type === "color") {
+      return `<label class="field field-color" for="${id}">
+        <input type="color" id="${id}" data-field="${field.id}" value="${escapeHtml(normalizeColor(value))}">
+        <span>${escapeHtml(field.label)}</span>
+      </label>`;
+    }
+    if (field.type === "select") {
+      const choices = field.dependsOn ? dependentOptions(state.tool, field, state.options) : field.options ?? [];
+      return `<label class="field" for="${id}">
+        <span>${escapeHtml(field.label)}</span>
+        <select id="${id}" data-field="${field.id}">
+          ${choices.map((choice) => `<option value="${escapeHtml(choice)}"${String(choice) === String(value) ? " selected" : ""}>${escapeHtml(field.labels?.[choice] ?? choice)}</option>`).join("")}
+        </select>
+      </label>`;
+    }
+    const numeric = field.type === "number";
+    return `<label class="field" for="${id}">
+      <span>${escapeHtml(field.label)}</span>
+      <input type="${numeric ? "number" : "text"}" id="${id}" data-field="${field.id}" value="${escapeHtml(value ?? "")}"
+        ${field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : ""}
+        ${field.min !== undefined ? `min="${field.min}"` : ""}
+        ${field.max !== undefined ? `max="${field.max}"` : ""}
+        ${field.step !== undefined ? `step="${field.step}"` : ""}>
+      ${field.help ? `<small>${escapeHtml(field.help)}</small>` : ""}
+    </label>`;
+  }).join("");
+}
+
+function normalizeColor(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value)) ? value : "#000000";
+}
+
+function defaultOptions(tool) {
+  const options = {};
+  for (const field of tool.fields) {
+    let value = field.value;
+    if (field.dependsOn) {
+      const choices = dependentOptions(tool, field, options);
+      if (!choices.includes(value)) value = choices[0];
+    }
+    options[field.id] = value;
+  }
+  return options;
+}
+
+/* ------------------------------------------------------------ open a tool */
+
+function sampleFor(tool, action) {
+  return tool.input.samples?.[action] ?? tool.input.sample ?? "";
+}
+
+function inputHidden(tool, action) {
+  if (tool.input.hidden) return true;
+  return Boolean(tool.input.hiddenWhen?.includes(action));
+}
+
+function openTool(id, { push = true, keepInput = false } = {}) {
+  const tool = TOOLS_BY_ID.get(id);
+  if (!tool) { showHome(); return; }
+
+  const sameTool = state.tool?.id === id;
+  state.tool = tool;
+  if (!sameTool) {
+    state.action = tool.actions[0] ?? null;
+    state.options = defaultOptions(tool);
+    state.file = null;
+  }
+  state.download = null;
+  state.previewHtml = "";
+  state.previewOpen = false;
+
+  dom.home.hidden = true;
+  dom.workbench.hidden = false;
+  dom.toolIcon.textContent = tool.icon;
+  dom.toolTitle.textContent = tool.name;
+  dom.toolBlurb.textContent = tool.blurb;
+
+  renderActions();
+  renderFields();
+
+  dom.inputLabel.textContent = tool.input.label ?? "Input";
+  dom.inputArea.placeholder = tool.input.placeholder ?? "Paste or type here…";
+  if (!keepInput) dom.inputArea.value = sampleFor(tool, state.action);
+  dom.inputPane.hidden = inputHidden(tool, state.action);
+
+  dom.secondaryPane.hidden = !tool.secondary;
+  if (tool.secondary) {
+    dom.secondaryLabel.textContent = tool.secondary.label ?? "Compare with";
+    if (!keepInput) dom.secondaryArea.value = tool.secondary.sample ?? "";
+  }
+
+  dom.fileButton.hidden = !tool.input.accept;
+  if (tool.input.accept) dom.fileInput.accept = tool.input.accept;
+  dom.fileChip.hidden = !state.file;
+  if (state.file) dom.fileChip.textContent = `${state.file.name} · ${formatBytes(state.file.size)} · held in memory only`;
+
+  dom.outputArea.value = "";
+  dom.preview.hidden = true;
+  dom.previewButton.hidden = true;
+  dom.previewButton.setAttribute("aria-pressed", "false");
+  dom.swatches.hidden = true;
+  dom.status.hidden = true;
+  dom.runButton.firstChild.nodeValue = runLabel();
+
+  layoutPanes();
+  updateMeters();
+  renderSidebar(dom.sidebarFilter.value);
+  closeSidebar();
+
+  if (push && location.hash !== `#/${id}`) history.pushState({ tool: id }, "", `#/${id}`);
+  document.title = `${tool.name} — Converter`;
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+
+  if (shouldAutoRun()) run({ silent: true });
+}
+
+function runLabel() {
+  if (!state.tool) return "Run";
+  if (!state.action) return "Run";
+  return state.action.replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function layoutPanes() {
+  const panes = 1 + (dom.inputPane.hidden ? 0 : 1) + (dom.secondaryPane.hidden ? 0 : 1);
+  dom.panes.dataset.panes = String(panes);
+}
+
+function shouldAutoRun() {
+  return Boolean(state.tool?.live) || inputHidden(state.tool, state.action);
+}
+
+function showHome({ push = true } = {}) {
+  state.tool = null;
+  dom.workbench.hidden = true;
+  dom.home.hidden = false;
+  document.title = "Converter — 92 developer tools, one workspace";
+  renderSidebar(dom.sidebarFilter.value);
+  if (push && location.hash !== "#/") history.pushState({}, "", "#/");
+}
+
+/* ------------------------------------------------------------------- run */
+
+async function run({ silent = false } = {}) {
+  const tool = state.tool;
+  if (!tool || state.running) return;
+  state.running = true;
+  const started = performance.now();
+  try {
+    const result = await tool.run({
+      input: dom.inputArea.value,
+      secondary: dom.secondaryArea.value,
+      action: state.action,
+      options: state.options,
+      file: state.file,
+      tool,
+    });
+    const payload = typeof result === "string" ? { text: result } : result ?? { text: "" };
+    dom.outputArea.value = payload.text ?? "";
+    state.download = payload.download ?? null;
+
+    state.previewHtml = payload.html ?? (tool.output.preview ? payload.text ?? "" : "");
+    dom.previewButton.hidden = !state.previewHtml;
+    if (state.previewHtml && (payload.html || state.previewOpen)) setPreview(true);
+    else setPreview(false);
+
+    if (payload.swatches?.length) {
+      dom.swatches.hidden = false;
+      dom.swatches.innerHTML = payload.swatches.slice(0, 24).map((value) => `<span class="swatch"><i style="background:${escapeHtml(value)}"></i>${escapeHtml(value)}</span>`).join("");
+    } else dom.swatches.hidden = true;
+
+    const elapsed = performance.now() - started;
+    const note = payload.note ? ` · ${payload.note}` : "";
+    setStatus(`Completed locally in ${elapsed < 1 ? elapsed.toFixed(2) : elapsed.toFixed(1)} ms${note}`, "good");
+  } catch (error) {
+    dom.outputArea.value = "";
+    dom.swatches.hidden = true;
+    setPreview(false);
+    dom.previewButton.hidden = true;
+    // An automatic run over an empty box should not nag; a deliberate one should.
+    if (silent && !dom.inputArea.value.trim() && !inputHidden(tool, state.action)) {
+      dom.status.hidden = true;
+      return;
+    }
+    const message = tool.describeError ? tool.describeError(error, dom.inputArea.value) : error.message;
+    setStatus(message || "Something went wrong.", "bad");
+  } finally {
+    state.running = false;
+    updateMeters();
+  }
+}
+
+function setStatus(message, tone) {
+  dom.status.hidden = false;
+  dom.status.textContent = message;
+  dom.status.dataset.tone = tone;
+}
+
+function setPreview(open) {
+  state.previewOpen = open && Boolean(state.previewHtml);
+  dom.preview.hidden = !state.previewOpen;
+  dom.outputArea.hidden = state.previewOpen;
+  dom.previewButton.setAttribute("aria-pressed", String(state.previewOpen));
+  if (state.previewOpen) dom.preview.innerHTML = sanitize(state.previewHtml);
+}
+
+/** Renders generated markup for preview with scripts and event handlers removed. */
+function sanitize(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  for (const node of template.content.querySelectorAll("script, iframe, object, embed, link, meta, base")) node.remove();
+  for (const node of template.content.querySelectorAll("*")) {
+    for (const attribute of [...node.attributes]) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+      if (name.startsWith("on")) node.removeAttribute(attribute.name);
+      else if ((name === "href" || name === "src" || name === "xlink:href") && /^(javascript|vbscript):/i.test(value)) node.removeAttribute(attribute.name);
+    }
+  }
+  return template.innerHTML;
+}
+
+function updateMeters() {
+  dom.inputMeter.textContent = byteSize(dom.inputArea.value);
+  dom.secondaryMeter.textContent = byteSize(dom.secondaryArea.value);
+  dom.outputMeter.textContent = byteSize(dom.outputArea.value);
+}
+
+function scheduleLive() {
+  if (!state.tool?.live) return;
+  clearTimeout(state.liveTimer);
+  state.liveTimer = setTimeout(() => run({ silent: true }), 180);
+}
+
+/* ------------------------------------------------------------- palette */
+
+function renderCommandResults(query = "") {
+  state.commandMatches = (query ? searchTools(query) : TOOLS).slice(0, 60);
+  state.commandIndex = 0;
+  if (!state.commandMatches.length) {
+    dom.commandResults.innerHTML = `<p class="empty">No tool matches “${escapeHtml(query)}”.</p>`;
+    return;
+  }
+  dom.commandResults.innerHTML = state.commandMatches.map((tool, index) => `
+    <button class="command-result" type="button" role="option" data-tool="${tool.id}" data-active="${index === 0}">
+      <span class="tool-icon" aria-hidden="true">${escapeHtml(tool.icon)}</span>
+      <span>
+        <strong>${escapeHtml(tool.name)}</strong>
+        <small>${escapeHtml(tool.category)} · ${escapeHtml(tool.blurb)}</small>
+      </span>
+    </button>`).join("");
+}
+
+function moveCommandSelection(delta) {
+  const items = [...dom.commandResults.querySelectorAll(".command-result")];
+  if (!items.length) return;
+  items[state.commandIndex]?.setAttribute("data-active", "false");
+  state.commandIndex = (state.commandIndex + delta + items.length) % items.length;
+  const active = items[state.commandIndex];
+  active.setAttribute("data-active", "true");
+  active.scrollIntoView({ block: "nearest" });
+}
+
+function openPalette() {
+  renderCommandResults();
+  dom.commandInput.value = "";
+  if (!dom.dialog.open) dom.dialog.showModal();
+  dom.commandInput.focus();
+}
+
+/* ------------------------------------------------------------- sidebar UI */
+
+function openSidebar() {
+  dom.sidebar.dataset.open = "true";
+  dom.scrim.hidden = false;
+  dom.menuButton.setAttribute("aria-expanded", "true");
+}
+
+function closeSidebar() {
+  dom.sidebar.dataset.open = "false";
+  dom.scrim.hidden = true;
+  dom.menuButton.setAttribute("aria-expanded", "false");
+}
+
+/* ----------------------------------------------------------------- files */
+
+async function acceptFile(file) {
+  if (!file) return;
+  if (file.size > MAX_FILE_BYTES) {
+    setStatus(`That file is ${formatBytes(file.size)}. Files above ${formatBytes(MAX_FILE_BYTES)} are not opened, to keep this tab responsive.`, "bad");
+    return;
+  }
+  const buffer = await file.arrayBuffer();
+  state.file = { name: file.name, size: file.size, type: file.type, buffer, blob: file };
+  dom.fileChip.hidden = false;
+  dom.fileChip.textContent = `${file.name} · ${formatBytes(file.size)} · held in memory only`;
+  if (!inputHidden(state.tool, state.action) && /\.(txt|csv|tsv|json|ya?ml|toml|xml|md|markdown|html?|css|js|sql|log|svg|ndjson)$/i.test(file.name)) {
+    dom.inputArea.value = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  }
+  updateMeters();
+  toast(`${file.name} opened locally`);
+  await run({ silent: true });
+}
+
+/* ----------------------------------------------------------------- wiring */
+
+document.addEventListener("click", (event) => {
+  const toolTarget = event.target.closest("[data-tool]");
+  if (toolTarget) {
+    if (dom.dialog.open) dom.dialog.close();
+    openTool(toolTarget.dataset.tool);
+    return;
+  }
+  const groupHead = event.target.closest(".nav-group-head");
+  if (groupHead) {
+    const group = groupHead.closest(".nav-group");
+    const open = group.dataset.open !== "true";
+    group.dataset.open = String(open);
+    groupHead.setAttribute("aria-expanded", String(open));
+    return;
+  }
+  const actionPill = event.target.closest(".action-pill");
+  if (actionPill) {
+    const next = actionPill.dataset.action;
+    if (next === state.action) return;
+    const previousSample = sampleFor(state.tool, state.action);
+    state.action = next;
+    renderActions();
+    renderFields();
+    dom.inputPane.hidden = inputHidden(state.tool, state.action);
+    layoutPanes();
+    const nextSample = sampleFor(state.tool, state.action);
+    if (nextSample && dom.inputArea.value.trim() === previousSample.trim()) dom.inputArea.value = nextSample;
+    dom.runButton.firstChild.nodeValue = runLabel();
+    updateMeters();
+    if (shouldAutoRun()) run({ silent: true });
+  }
+});
+
+dom.fieldBar.addEventListener("input", (event) => {
+  const control = event.target.closest("[data-field]");
+  if (!control) return;
+  const field = state.tool.fields.find((entry) => entry.id === control.dataset.field);
+  if (!field) return;
+  const value = field.type === "toggle" ? control.checked : field.type === "number" ? Number(control.value) : control.value;
+  state.options[field.id] = value;
+  if (field.binds === "input") dom.inputArea.value = value;
+  if (state.tool.fields.some((entry) => entry.dependsOn === field.id)) {
+    for (const dependent of state.tool.fields.filter((entry) => entry.dependsOn === field.id)) {
+      const choices = dependentOptions(state.tool, dependent, state.options);
+      if (!choices.includes(state.options[dependent.id])) state.options[dependent.id] = choices[0];
+    }
+    renderFields();
+  }
+  updateMeters();
+  if (state.tool.live) scheduleLive();
+});
+
+dom.inputArea.addEventListener("input", () => {
+  const picker = state.tool?.fields.find((field) => field.binds === "input");
+  if (picker) {
+    const value = dom.inputArea.value.trim();
+    if (/^#[0-9a-f]{6}$/i.test(value)) {
+      state.options[picker.id] = value;
+      const control = dom.fieldBar.querySelector(`[data-field="${picker.id}"]`);
+      if (control) control.value = value;
+    }
+  }
+  updateMeters();
+  scheduleLive();
+});
+
+dom.secondaryArea.addEventListener("input", () => { updateMeters(); scheduleLive(); });
+
+// The key-code tool identifies whatever you press. Tab and Escape are left
+// alone so the field never becomes a keyboard trap.
+const PASS_THROUGH_KEYS = new Set(["Tab", "Escape"]);
+
+dom.inputArea.addEventListener("keydown", (event) => {
+  if (!state.tool?.captureKeys) return;
+  if (PASS_THROUGH_KEYS.has(event.key) || event.ctrlKey || event.metaKey || event.altKey) return;
+  event.preventDefault();
+  dom.inputArea.value = String(event.keyCode);
+  updateMeters();
+  run({ silent: true });
+});
+
+dom.runButton.addEventListener("click", () => run());
+$("#resetButton").addEventListener("click", () => {
+  state.file = null;
+  dom.fileInput.value = "";
+  openTool(state.tool.id, { push: false });
+  toast("Tool reset");
+});
+$("#closeTool").addEventListener("click", () => showHome());
+$("#clearButton").addEventListener("click", () => {
+  dom.inputArea.value = "";
+  dom.inputArea.focus();
+  updateMeters();
+  scheduleLive();
+});
+$("#pasteButton").addEventListener("click", async () => {
+  try {
+    const value = await navigator.clipboard.readText();
+    if (!value) { toast("The clipboard is empty"); return; }
+    dom.inputArea.value = value;
+    updateMeters();
+    await run({ silent: true });
+    toast("Pasted from the clipboard");
+  } catch {
+    toast("This browser blocked clipboard reading — paste with the keyboard instead");
+    dom.inputArea.focus();
+  }
+});
+$("#copyButton").addEventListener("click", async () => {
+  if (!dom.outputArea.value) { toast("There is nothing to copy yet"); return; }
+  try {
+    await navigator.clipboard.writeText(dom.outputArea.value);
+    toast("Output copied");
+  } catch {
+    dom.outputArea.select();
+    document.execCommand?.("copy");
+    toast("Output copied");
+  }
+});
+$("#swapButton").addEventListener("click", () => {
+  if (!dom.outputArea.value) { toast("Run the tool first, then swap"); return; }
+  dom.inputArea.value = dom.outputArea.value;
+  dom.outputArea.value = "";
+  updateMeters();
+  toast("Output moved into the input");
+  if (state.tool?.live) run({ silent: true });
+});
+$("#downloadButton").addEventListener("click", () => {
+  const output = dom.outputArea.value;
+  if (!state.download && !output) { toast("There is nothing to download yet"); return; }
+  const blob = state.download?.blob ?? new Blob([output], { type: "text/plain;charset=utf-8" });
+  const name = state.download?.name ?? state.tool?.output.filename ?? `converter-${state.tool?.id ?? "output"}.txt`;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`Saving ${name}`);
+});
+dom.previewButton.addEventListener("click", () => setPreview(!state.previewOpen));
+
+dom.fileInput.addEventListener("change", (event) => acceptFile(event.target.files[0]));
+
+for (const zone of [dom.inputArea, dom.inputPane]) {
+  zone.addEventListener("dragover", (event) => { event.preventDefault(); });
+  zone.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    event.preventDefault();
+    acceptFile(file);
+  });
+}
+
+dom.sidebarFilter.addEventListener("input", (event) => {
+  renderSidebar(event.target.value);
+  if (!state.tool) renderCatalogue(event.target.value);
+});
+
+dom.menuButton.addEventListener("click", () => (dom.sidebar.dataset.open === "true" ? closeSidebar() : openSidebar()));
+dom.scrim.addEventListener("click", closeSidebar);
+
+$("#commandButton").addEventListener("click", openPalette);
+$("#heroSearch").addEventListener("click", openPalette);
+$("#heroBrowse").addEventListener("click", () => dom.catalogue.scrollIntoView({ behavior: "smooth", block: "start" }));
+
+dom.commandInput.addEventListener("input", (event) => renderCommandResults(event.target.value));
+dom.commandInput.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown") { event.preventDefault(); moveCommandSelection(1); }
+  else if (event.key === "ArrowUp") { event.preventDefault(); moveCommandSelection(-1); }
+  else if (event.key === "Enter") {
+    event.preventDefault();
+    const chosen = state.commandMatches[state.commandIndex];
+    if (chosen) { dom.dialog.close(); openTool(chosen.id); }
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const modifier = isApple ? event.metaKey : event.ctrlKey;
+  if (modifier && event.key.toLowerCase() === "k") { event.preventDefault(); openPalette(); return; }
+  if (modifier && event.key === "Enter" && state.tool) { event.preventDefault(); run(); return; }
+  if (event.key === "Escape") {
+    if (dom.dialog.open) dom.dialog.close();
+    else if (dom.sidebar.dataset.open === "true") closeSidebar();
+  }
+  if (event.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) {
+    event.preventDefault();
+    openPalette();
+  }
+});
+
+$("#themeButton").addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  applyTheme(next);
+  localStorage.setItem("converter-theme", next);
+});
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $("#themeIcon").textContent = theme === "light" ? "◐" : "◑";
+  $("#themeButton").setAttribute("aria-label", `Switch to the ${theme === "light" ? "dark" : "light"} theme`);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "light" ? "#f6f7fb" : "#0e0f14");
+}
+
+window.addEventListener("popstate", () => routeFromHash({ push: false }));
+
+function routeFromHash({ push = true } = {}) {
+  const id = location.hash.replace(/^#\/?/, "");
+  if (id && TOOLS_BY_ID.has(id)) openTool(id, { push });
+  else showHome({ push: push && location.hash !== "" });
+}
+
+/* ------------------------------------------------------------------ boot */
+
+function boot() {
+  const stored = localStorage.getItem("converter-theme");
+  applyTheme(stored === "light" || stored === "dark" ? stored : (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+
+  const shortcut = isApple ? "⌘ K" : "Ctrl K";
+  $("#commandHint").textContent = shortcut;
+  $("#heroHint").textContent = shortcut;
+
+  const count = String(TOOLS.length);
+  document.querySelector(".command-trigger-label").textContent = `Search ${count} tools…`;
+  document.querySelector(".hero-facts strong").textContent = count;
+  document.querySelector(".hero-lead").textContent = `${count} working tools for the formats you touch every day — data, text, encoding, crypto, colour, networking, dates, and Office documents. Every byte is processed in this tab.`;
+
+  renderSidebar();
+  renderCatalogue();
+  routeFromHash({ push: false });
+}
+
+boot();
