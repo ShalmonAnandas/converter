@@ -2,6 +2,7 @@
 
 import { randomBytes, randomIndex, bytesToHex } from "./bytes.js";
 import { digestBytes } from "./crypto.js";
+import { report } from "./report.js";
 
 export const UUID_NAMESPACES = {
   DNS: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
@@ -90,8 +91,8 @@ export function maxUuid() { return "ffffffff-ffff-ffff-ffff-ffffffffffff"; }
 
 export function inspectUuid(value) {
   const trimmed = value.trim();
-  if (trimmed === nilUuid()) return "Nil UUID — the all-zero special value.";
-  if (trimmed.toLowerCase() === maxUuid()) return "Max UUID — the all-ones special value.";
+  if (trimmed === nilUuid()) return report([["Canonical", trimmed], ["Version", "Nil UUID — the all-zero special value"]]);
+  if (trimmed.toLowerCase() === maxUuid()) return report([["Canonical", trimmed], ["Version", "Max UUID — the all-ones special value"]]);
   const bytes = uuidToBytes(trimmed);
   const version = bytes[6] >> 4;
   const variantBits = bytes[8] >> 5;
@@ -118,8 +119,7 @@ export function inspectUuid(value) {
     const milliseconds = view.getUint32(0, false) * 0x10000 + view.getUint16(4, false);
     rows.push(["Timestamp", new Date(milliseconds).toISOString()]);
   }
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }
 
 function describeVersion(version) {
@@ -152,11 +152,11 @@ export function inspectUlid(value) {
   let milliseconds = 0;
   for (const character of trimmed.slice(0, 10)) milliseconds = milliseconds * 32 + CROCKFORD.indexOf(character);
   if (milliseconds > 281474976710655) throw new Error("The ULID timestamp is out of range");
-  return [
-    `ULID       ${trimmed}`,
-    `Timestamp  ${new Date(milliseconds).toISOString()} (${milliseconds} ms)`,
-    `Randomness ${trimmed.slice(10)}`,
-  ].join("\n");
+  return report([
+    ["ULID", trimmed, "accent"],
+    ["Timestamp", `${new Date(milliseconds).toISOString()} (${milliseconds} ms)`],
+    ["Randomness", trimmed.slice(10)],
+  ]);
 }
 
 /* -------------------------------------------------------------- nano id -- */
@@ -184,15 +184,17 @@ export function inspectMac(value) {
   if (hex.length !== 12) throw new Error("A MAC address has six bytes (twelve hexadecimal digits)");
   const bytes = hex.match(/../g).map((pair) => Number.parseInt(pair, 16));
   const first = bytes[0];
-  return [
-    `Colon       ${bytes.map((byte) => byte.toString(16).padStart(2, "0")).join(":")}`,
-    `Hyphen      ${bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("-").toUpperCase()}`,
-    `Cisco       ${hex.match(/..../g).join(".")}`,
-    `Bare        ${hex}`,
+  return report([
+    "Notations",
+    ["Colon", bytes.map((byte) => byte.toString(16).padStart(2, "0")).join(":"), "accent"],
+    ["Hyphen", bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("-").toUpperCase()],
+    ["Cisco", hex.match(/..../g).join(".")],
+    ["Bare", hex],
     "",
-    `OUI         ${hex.slice(0, 6).match(/../g).join(":").toUpperCase()}`,
-    `Scope       ${first & 0x02 ? "Locally administered" : "Universally administered (vendor assigned)"}`,
-    `Cast        ${first & 0x01 ? "Multicast" : "Unicast"}`,
-    `EUI-64      ${[...bytes.slice(0, 3).map((byte, index) => (index === 0 ? byte ^ 0x02 : byte)), 0xff, 0xfe, ...bytes.slice(3)].map((byte) => byte.toString(16).padStart(2, "0")).join(":")}`,
-  ].join("\n");
+    "Properties",
+    ["OUI", hex.slice(0, 6).match(/../g).join(":").toUpperCase()],
+    ["Scope", first & 0x02 ? "Locally administered" : "Universally administered (vendor assigned)"],
+    ["Cast", first & 0x01 ? "Multicast" : "Unicast"],
+    ["EUI-64", [...bytes.slice(0, 3).map((byte, index) => (index === 0 ? byte ^ 0x02 : byte)), 0xff, 0xfe, ...bytes.slice(3)].map((byte) => byte.toString(16).padStart(2, "0")).join(":")],
+  ]);
 }

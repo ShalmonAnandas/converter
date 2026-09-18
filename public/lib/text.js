@@ -1,6 +1,7 @@
 // Text transformation, analysis, and comparison utilities.
 
 import { randomIndex } from "./bytes.js";
+import { report } from "./report.js";
 
 /* ------------------------------------------------------------- casing --- */
 
@@ -46,8 +47,7 @@ export function convertCase(input, style) {
 export function allCases(input) {
   const words = splitWords(input);
   if (!words.length) throw new Error("Enter some text to convert");
-  const width = Math.max(...Object.keys(CASE_STYLES).map((style) => style.length));
-  return Object.entries(CASE_STYLES).map(([style, transform]) => `${style.padEnd(width)}  ${transform(words)}`).join("\n");
+  return report(Object.entries(CASE_STYLES).map(([style, transform]) => [style, transform(words)]));
 }
 
 export function slugify(input, { separator = "-", lowercase = true, maxLength = 0 } = {}) {
@@ -92,10 +92,8 @@ export function textStatistics(input) {
     ["Reading time", formatMinutes(readingMinutes)],
     ["Speaking time", formatMinutes(speakingMinutes)],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  const summary = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`).join("\n");
-  if (!top.length) return summary;
-  return `${summary}\n\nMost frequent words\n${top.map(([word, count]) => `  ${String(count).padStart(4)}  ${word}`).join("\n")}`;
+  if (!top.length) return report(rows);
+  return report([...rows, "", "Most frequent words", ...top.map(([word, count]) => [word, String(count)])]);
 }
 
 function formatMinutes(minutes) {

@@ -1,6 +1,8 @@
 // Numeric conversion, a safe expression evaluator, unit conversion, and the
 // small calculators developers reach for.
 
+import { report } from "./report.js";
+
 /* ---------------------------------------------------------------- bases -- */
 
 const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -51,8 +53,7 @@ export function baseReport(value, from) {
     rows.push(["Bit length", String(formatInBase(number, 2).replace("-", "").length)]);
     if (number <= 0xffffffffn) rows.push(["As bytes", formatInBase(number, 16).padStart(8, "0").match(/../g).join(" ")]);
   }
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }
 
 /* ---------------------------------------------------------------- roman -- */
@@ -302,11 +303,7 @@ export function unitReport(value, category, from) {
   const names = category === "temperature" ? Object.keys(TEMPERATURES) : Object.keys(UNITS[category] ?? {});
   if (!names.length) throw new Error(`Unknown unit category "${category}"`);
   if (!names.includes(from)) throw new Error(`"${from}" is not a ${category} unit`);
-  const width = Math.max(...names.map((name) => name.length));
-  return names.map((name) => {
-    const converted = convertUnit(amount, category, from, name);
-    return `${name.padEnd(width)}  ${formatNumber(converted)}`;
-  }).join("\n");
+  return report(names.map((name) => [name, formatNumber(convertUnit(amount, category, from, name)), name === from ? "accent" : undefined]));
 }
 
 export function formatNumber(value) {
@@ -337,27 +334,23 @@ export function chmodReport(input) {
     else text += executable ? "x" : "-";
     return text;
   }).join("");
-  const rows = [
-    ["Octal", octal[0] === "0" ? octal.slice(1) : octal],
-    ["Full octal", octal],
-    ["Symbolic", symbolic],
-    ["chmod command", `chmod ${octal[0] === "0" ? octal.slice(1) : octal} path`],
-    ["", ""],
-  ];
   const detail = labels.map((label, index) => {
     const bit = bits[index];
     const permissions = [bit & 4 ? "read" : null, bit & 2 ? "write" : null, bit & 1 ? "execute" : null].filter(Boolean);
-    return `${label.padEnd(6)} ${bit}  ${permissions.length ? permissions.join(", ") : "no access"}`;
+    return [label, `${bit}  ${permissions.length ? permissions.join(", ") : "no access"}`];
   });
   const specials = [special & 4 ? "setuid" : null, special & 2 ? "setgid" : null, special & 1 ? "sticky bit" : null].filter(Boolean);
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return [
-    ...rows.filter(([label]) => label).map(([label, item]) => `${label.padEnd(width)}  ${item}`),
+  return report([
+    ["Octal", octal[0] === "0" ? octal.slice(1) : octal, "accent"],
+    ["Full octal", octal],
+    ["Symbolic", symbolic, "accent"],
+    ["chmod command", `chmod ${octal[0] === "0" ? octal.slice(1) : octal} path`],
     "",
+    "Who can do what",
     ...detail,
     "",
-    `Special  ${special}  ${specials.length ? specials.join(", ") : "none"}`,
-  ].join("\n");
+    ["Special bits", `${special}  ${specials.length ? specials.join(", ") : "none"}`],
+  ]);
 }
 
 function symbolicToOctal(symbolic) {
@@ -390,6 +383,5 @@ export function percentageReport(a, b) {
     [`${x} after removing ${y}% tax`, formatNumber(x / (1 + y / 100))],
     [`Difference of ${x} and ${y}`, (x + y) === 0 ? "undefined" : `${formatNumber((Math.abs(x - y) / ((x + y) / 2)) * 100)}%`],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }

@@ -33,6 +33,26 @@ function blobFor(content, type) {
   return new Blob([content], { type });
 }
 
+
+/** A block of sample text on the chosen background, at the sizes WCAG cares about. */
+function contrastPreview(foreground, background) {
+  const safe = (value) => String(value).replace(/[^#\w(),.%\s-]/g, "");
+  return `<div style="background:${safe(background)};color:${safe(foreground)};padding:32px;border-radius:14px;">
+    <p style="font-size:28px;font-weight:700;margin:0 0 14px;">Large text, 28px bold</p>
+    <p style="font-size:19px;margin:0 0 14px;">Large text, 19px regular</p>
+    <p style="font-size:16px;margin:0 0 14px;">Body text at 16px — the size most interfaces use for reading.</p>
+    <p style="font-size:13px;margin:0;">Small print at 13px, the hardest case to get right.</p>
+  </div>`;
+}
+
+function swatchPreview(hex) {
+  const safe = String(hex).replace(/[^#\w]/g, "");
+  return `<div style="display:grid;place-items:center;gap:18px;">
+    <div style="width:220px;height:220px;border-radius:24px;background:${safe};box-shadow:0 18px 50px #0003;"></div>
+    <code style="font-size:18px;letter-spacing:0.04em;">${safe}</code>
+  </div>`;
+}
+
 /* ================================================================ JSON === */
 
 const jsonTools = [
@@ -68,7 +88,7 @@ const jsonTools = [
     keywords: ["compare", "difference", "changes", "delta"],
     input: { label: "Original", sample: '{"name":"converter","version":"0.9.0","tools":9,"tags":["local"]}' },
     secondary: { label: "Changed", sample: '{"name":"converter","version":"1.0.0","tools":92,"tags":["local","fast"],"license":"MIT"}' },
-    output: { filename: "json-diff.txt" },
+    output: { filename: "json-diff.txt", diff: true },
     live: true,
     run: ({ input, secondary }) => jsonDiff(input, secondary),
   },
@@ -283,7 +303,7 @@ const converterTools = [
 
 const textTools = [
   {
-    id: "case", name: "Case Converter", icon: "Aa", blurb: "Rewrite identifiers in every convention at once, or pick a single style.",
+    id: "case", layout: "stack", name: "Case Converter", icon: "Aa", blurb: "Rewrite identifiers in every convention at once, or pick a single style.",
     keywords: ["camelcase", "snake_case", "kebab", "pascal", "title", "constant"],
     actions: ["all styles", ...Object.keys(text.CASE_STYLES)],
     input: { sample: "convert anything keep everything private" },
@@ -292,7 +312,7 @@ const textTools = [
     run: ({ input, action }) => (action === "all styles" ? text.allCases(input) : text.convertCase(input, action)),
   },
   {
-    id: "slugify", name: "Slugify", icon: "/", blurb: "Build URL-safe slugs: accents folded, punctuation dropped, separators collapsed.",
+    id: "slugify", layout: "stack", name: "Slugify", icon: "/", blurb: "Build URL-safe slugs: accents folded, punctuation dropped, separators collapsed.",
     keywords: ["url", "permalink", "seo", "kebab", "handle"],
     fields: [
       { id: "separator", type: "select", label: "Separator", value: "-", options: ["-", "_", "."], labels: { "-": "Hyphen", _: "Underscore", ".": "Dot" } },
@@ -314,7 +334,7 @@ const textTools = [
     ],
     input: { label: "Original", sample: "The quick brown fox\njumps over\nthe lazy dog" },
     secondary: { label: "Changed", sample: "The quick brown fox\nleaps over\nthe lazy dog\nand runs away" },
-    output: { filename: "diff.txt" },
+    output: { filename: "diff.txt", diff: true },
     live: true,
     run: ({ input, secondary, options }) => {
       const ratio = text.similarityRatio(input, secondary);
@@ -322,7 +342,7 @@ const textTools = [
     },
   },
   {
-    id: "text-stats", name: "Text Statistics", icon: "Σ", blurb: "Counts, reading time, and word frequency for any block of prose.",
+    id: "text-stats", layout: "stack", name: "Text Statistics", icon: "Σ", blurb: "Counts, reading time, and word frequency for any block of prose.",
     keywords: ["word count", "characters", "reading time", "frequency"],
     input: { sample: "The quick brown fox jumps over the lazy dog. The dog sleeps on." },
     output: { filename: "statistics.txt" },
@@ -412,7 +432,7 @@ const textTools = [
     run: ({ input, options }) => text.obfuscate(input, options),
   },
   {
-    id: "nato", name: "NATO and Morse", icon: "▁▄", blurb: "Spell text out phonetically, or encode and decode Morse code.",
+    id: "nato", layout: "stack", name: "NATO and Morse", icon: "▁▄", blurb: "Spell text out phonetically, or encode and decode Morse code.",
     keywords: ["phonetic", "alfa", "bravo", "radio", "spelling"],
     actions: ["nato alphabet", "to morse", "from morse", "numeronym"],
     input: {
@@ -706,7 +726,7 @@ function decodePunycode(input) {
 
 const cryptoTools = [
   {
-    id: "hash", name: "Hash Text", icon: "#", blurb: "MD5, SHA-1, SHA-256, SHA-384, SHA-512, and CRC-32 side by side or one at a time.",
+    id: "hash", layout: "stack", name: "Hash Text", icon: "#", blurb: "MD5, SHA-1, SHA-256, SHA-384, SHA-512, and CRC-32 side by side or one at a time.",
     keywords: ["md5", "sha256", "sha512", "checksum", "digest", "crc"],
     actions: ["all algorithms", ...crypt.HASH_ALGORITHMS],
     fields: [{ id: "encoding", type: "select", label: "Output", value: "hex", options: ["hex", "base64", "base64url", "binary"], when: crypt.HASH_ALGORITHMS }],
@@ -716,7 +736,7 @@ const cryptoTools = [
     run: async ({ input, action, options }) => (action === "all algorithms" ? crypt.hashAll(input) : crypt.generateHash(input, action, options.encoding)),
   },
   {
-    id: "file-hash", name: "Hash a File", icon: "⌗", blurb: "Verify a download by checksum without uploading it anywhere.",
+    id: "file-hash", layout: "stack", name: "Hash a File", icon: "⌗", blurb: "Verify a download by checksum without uploading it anywhere.",
     keywords: ["checksum", "sha256sum", "verify", "integrity", "md5sum"],
     fields: [{ id: "expected", type: "text", label: "Expected checksum", value: "", placeholder: "paste a checksum to compare" }],
     input: { accept: "*/*", hidden: true },
@@ -749,7 +769,7 @@ const cryptoTools = [
     run: ({ input, options }) => crypt.generateHmac(input, options.secret, options.algorithm, options.encoding),
   },
   {
-    id: "jwt", name: "JWT", icon: "•|•", blurb: "Inspect claims, verify an HMAC signature, or sign a new token locally.",
+    id: "jwt", layout: "stack", name: "JWT", icon: "•|•", blurb: "Inspect claims, verify an HMAC signature, or sign a new token locally.",
     keywords: ["token", "bearer", "claims", "hs256", "decode", "verify"],
     actions: ["inspect", "verify", "sign"],
     fields: [
@@ -795,7 +815,7 @@ const cryptoTools = [
       : crypt.decryptText(input, options.passphrase)),
   },
   {
-    id: "pbkdf2", name: "Key Derivation", icon: "⚙", blurb: "Derive a key from a password with PBKDF2 and inspect every parameter.",
+    id: "pbkdf2", layout: "stack", name: "Key Derivation", icon: "⚙", blurb: "Derive a key from a password with PBKDF2 and inspect every parameter.",
     keywords: ["pbkdf2", "kdf", "salt", "iterations", "password hashing"],
     fields: [
       { id: "salt", type: "text", label: "Salt", value: "", placeholder: "leave empty for a random 16-byte salt" },
@@ -816,7 +836,7 @@ const cryptoTools = [
     run: ({ options }) => crypt.generateKeyPair(options.kind),
   },
   {
-    id: "totp", name: "TOTP Codes", icon: "⏱", blurb: "Generate the current time-based one-time password from a Base32 secret.",
+    id: "totp", layout: "stack", name: "TOTP Codes", icon: "⏱", blurb: "Generate the current time-based one-time password from a Base32 secret.",
     keywords: ["2fa", "otp", "authenticator", "mfa", "rfc6238"],
     actions: ["generate code", "new secret"],
     fields: [
@@ -845,7 +865,7 @@ const cryptoTools = [
     },
   },
   {
-    id: "password", name: "Password Generator", icon: "✦", blurb: "Cryptographically random passwords with the character sets you choose.",
+    id: "password", cards: true, name: "Password Generator", icon: "✦", blurb: "Cryptographically random passwords with the character sets you choose.",
     keywords: ["random", "passphrase", "secure", "generate", "credentials"],
     fields: [
       { id: "length", type: "number", label: "Length", value: 20, min: 4, max: 256 },
@@ -864,7 +884,7 @@ const cryptoTools = [
     },
   },
   {
-    id: "password-strength", name: "Password Strength", icon: "◑", blurb: "Entropy, alphabet size, and an offline cracking estimate with concrete issues.",
+    id: "password-strength", layout: "stack", name: "Password Strength", icon: "◑", blurb: "Entropy, alphabet size, and an offline cracking estimate with concrete issues.",
     keywords: ["entropy", "audit", "weak", "bits", "crack"],
     input: { sample: "correct-horse-battery-staple", label: "Password" },
     output: { filename: "strength.txt" },
@@ -872,7 +892,7 @@ const cryptoTools = [
     run: ({ input }) => crypt.analyzePassword(input.split("\n")[0]),
   },
   {
-    id: "token", name: "Token Generator", icon: "⧉", blurb: "Random API keys and identifiers in the alphabet you need.",
+    id: "token", cards: true, name: "Token Generator", icon: "⧉", blurb: "Random API keys and identifiers in the alphabet you need.",
     keywords: ["api key", "secret", "random", "nonce", "session"],
     fields: [
       { id: "length", type: "number", label: "Length", value: 32, min: 1, max: 512 },
@@ -885,7 +905,7 @@ const cryptoTools = [
     run: ({ options }) => Array.from({ length: options.count }, () => options.prefix + crypt.generateToken(options)).join("\n"),
   },
   {
-    id: "basic-auth", name: "Basic Auth Header", icon: "⊡", blurb: "Build the Authorization header and matching curl commands.",
+    id: "basic-auth", layout: "stack", name: "Basic Auth Header", icon: "⊡", blurb: "Build the Authorization header and matching curl commands.",
     keywords: ["authorization", "credentials", "curl", "http", "header"],
     fields: [
       { id: "username", type: "text", label: "Username", value: "ada" },
@@ -902,7 +922,7 @@ const cryptoTools = [
 
 const generatorTools = [
   {
-    id: "uuid", name: "UUID Generator", icon: "id", blurb: "Versions 1, 3, 4, 5, and 7, plus an inspector that decodes any UUID.",
+    id: "uuid", cards: true, layout: "stack", name: "UUID Generator", icon: "id", blurb: "Versions 1, 3, 4, 5, and 7, plus an inspector that decodes any UUID.",
     keywords: ["guid", "v4", "v7", "identifier", "unique", "namespace"],
     actions: ["v4 random", "v7 time ordered", "v1 time based", "v5 name based", "v3 name based", "inspect"],
     fields: [
@@ -923,7 +943,7 @@ const generatorTools = [
     },
   },
   {
-    id: "ulid", name: "ULID and Nano ID", icon: "01", blurb: "Sortable ULIDs and compact Nano IDs, with a ULID timestamp decoder.",
+    id: "ulid", cards: true, layout: "stack", name: "ULID and Nano ID", icon: "01", blurb: "Sortable ULIDs and compact Nano IDs, with a ULID timestamp decoder.",
     keywords: ["sortable", "nanoid", "short id", "lexicographic", "identifier"],
     actions: ["ulid", "nano id", "inspect ulid"],
     fields: [
@@ -939,7 +959,7 @@ const generatorTools = [
     },
   },
   {
-    id: "qr", name: "QR Code", icon: "▩", blurb: "Full ISO 18004 encoder — URLs, Wi-Fi joins, and contact cards, as SVG you can download.",
+    id: "qr", layout: "canvas", name: "QR Code", icon: "▩", blurb: "Full ISO 18004 encoder — URLs, Wi-Fi joins, and contact cards, as SVG you can download.",
     keywords: ["barcode", "wifi", "vcard", "scan", "svg", "2d"],
     actions: ["text or url", "wi-fi network", "contact card"],
     fields: [
@@ -974,7 +994,7 @@ const generatorTools = [
     },
   },
   {
-    id: "mac", name: "MAC Address", icon: "⑉", blurb: "Generate locally administered addresses, or decode the parts of an existing one.",
+    id: "mac", cards: true, layout: "stack", name: "MAC Address", icon: "⑉", blurb: "Generate locally administered addresses, or decode the parts of an existing one.",
     keywords: ["ethernet", "oui", "hardware", "eui-64", "network"],
     actions: ["generate", "inspect"],
     fields: [
@@ -990,7 +1010,7 @@ const generatorTools = [
       : Array.from({ length: options.count }, () => ids.macAddress(options)).join("\n")),
   },
   {
-    id: "svg-placeholder", name: "Placeholder Image", icon: "▭", blurb: "A dependency-free SVG placeholder sized exactly how you need it.",
+    id: "svg-placeholder", layout: "canvas", name: "Placeholder Image", icon: "▭", blurb: "A dependency-free SVG placeholder sized exactly how you need it.",
     keywords: ["mockup", "dummy", "image", "wireframe", "prototype"],
     fields: [
       { id: "width", type: "number", label: "Width", value: 800, min: 16, max: 4000 },
@@ -1013,7 +1033,7 @@ const generatorTools = [
 
 const webTools = [
   {
-    id: "color", name: "Colour Converter", icon: "◐", blurb: "Every notation at once — HEX, RGB, HSL, HSV, CMYK, OKLCH, CIELAB — with contrast.",
+    id: "color", layout: "canvas", name: "Colour Converter", icon: "◐", blurb: "Every notation at once — HEX, RGB, HSL, HSV, CMYK, OKLCH, CIELAB — with contrast.",
     keywords: ["hex", "rgb", "hsl", "oklch", "cmyk", "picker", "css"],
     fields: [{ id: "picker", type: "color", label: "Pick", value: "#3b82f6", binds: "input" }],
     input: { sample: "#3b82f6", label: "Colour" },
@@ -1021,11 +1041,12 @@ const webTools = [
     live: true,
     run: ({ input }) => {
       const value = input.trim().split("\n")[0];
-      return { text: color.describeColor(value), swatches: [color.toHex(color.parseColor(value), { short: false })] };
+      const hex = color.toHex(color.parseColor(value), { short: false });
+      return { ...color.describeColor(value), swatches: [hex], html: swatchPreview(hex) };
     },
   },
   {
-    id: "contrast", name: "Contrast Checker", icon: "◨", blurb: "WCAG 2.2 contrast ratio for a foreground and background pair.",
+    id: "contrast", layout: "canvas", name: "Contrast Checker", icon: "◨", blurb: "WCAG 2.2 contrast ratio for a foreground and background pair.",
     keywords: ["wcag", "accessibility", "a11y", "ratio", "aa", "aaa"],
     fields: [
       { id: "foreground", type: "color", label: "Foreground", value: "#767676" },
@@ -1034,10 +1055,14 @@ const webTools = [
     input: { hidden: true },
     output: { filename: "contrast.txt" },
     live: true,
-    run: ({ options }) => ({ text: color.checkContrast(options.foreground, options.background), swatches: [options.foreground, options.background] }),
+    run: ({ options }) => ({
+      ...color.checkContrast(options.foreground, options.background),
+      swatches: [options.foreground, options.background],
+      html: contrastPreview(options.foreground, options.background),
+    }),
   },
   {
-    id: "palette", name: "Colour Palette", icon: "◔", blurb: "Build shades, tints, and harmonies from a single base colour.",
+    id: "palette", layout: "canvas", name: "Colour Palette", icon: "◔", blurb: "Build shades, tints, and harmonies from a single base colour.",
     keywords: ["scheme", "harmony", "tints", "shades", "complementary", "design tokens"],
     actions: ["shades", "tints", "monochromatic", "analogous", "complementary", "split complementary", "triadic", "tetradic"],
     fields: [{ id: "picker", type: "color", label: "Base colour", value: "#3b82f6", binds: "input" }],
@@ -1045,8 +1070,8 @@ const webTools = [
     output: { filename: "palette.txt" },
     live: true,
     run: ({ input, action }) => {
-      const output = color.buildPalette(input.trim().split("\n")[0], action);
-      return { text: output, swatches: color.swatchesFor(output) };
+      const palette = color.buildPalette(input.trim().split("\n")[0], action);
+      return { ...palette, swatches: color.swatchesFor(palette.text) };
     },
   },
   {
@@ -1098,7 +1123,7 @@ const webTools = [
     },
   },
   {
-    id: "meta", name: "Meta Tags", icon: "⌂", blurb: "Primary, Open Graph, and Twitter card tags for a page, correctly escaped.",
+    id: "meta", layout: "stack", name: "Meta Tags", icon: "⌂", blurb: "Primary, Open Graph, and Twitter card tags for a page, correctly escaped.",
     keywords: ["seo", "open graph", "twitter card", "social", "head"],
     fields: [
       { id: "title", type: "text", label: "Title", value: "Converter — developer tools in one workspace" },
@@ -1117,7 +1142,7 @@ const webTools = [
     run: ({ options }) => markup.metaTags(options),
   },
   {
-    id: "image", name: "Image Converter", icon: "▣", blurb: "Convert between PNG, JPEG, and WebP, resize, and re-compress — all on the canvas.",
+    id: "image", layout: "canvas", name: "Image Converter", icon: "▣", blurb: "Convert between PNG, JPEG, and WebP, resize, and re-compress — all on the canvas.",
     keywords: ["png", "jpeg", "webp", "resize", "compress", "optimise"],
     actions: ["convert", "inspect"],
     fields: [
@@ -1145,7 +1170,7 @@ const webTools = [
 
 const networkTools = [
   {
-    id: "subnet", name: "Subnet Calculator", icon: "⊟", blurb: "Network, broadcast, host range, wildcard, class, and scope for any CIDR block.",
+    id: "subnet", layout: "stack", name: "Subnet Calculator", icon: "⊟", blurb: "Network, broadcast, host range, wildcard, class, and scope for any CIDR block.",
     keywords: ["cidr", "netmask", "ipv4", "vlsm", "broadcast", "hosts"],
     input: { sample: "192.168.1.130/26", label: "CIDR block" },
     output: { filename: "subnet.txt" },
@@ -1153,7 +1178,7 @@ const networkTools = [
     run: ({ input }) => net.subnetReport(input.trim().split("\n")[0]),
   },
   {
-    id: "ip-convert", name: "IP Address Converter", icon: "◎", blurb: "Dotted quad, decimal, hex, octal, binary, IPv6-mapped, and reverse DNS.",
+    id: "ip-convert", layout: "stack", name: "IP Address Converter", icon: "◎", blurb: "Dotted quad, decimal, hex, octal, binary, IPv6-mapped, and reverse DNS.",
     keywords: ["ipv4", "decimal", "hex", "binary", "arpa", "integer"],
     input: { sample: "192.168.1.1", label: "IPv4 address or integer" },
     output: { filename: "address.txt" },
@@ -1161,7 +1186,7 @@ const networkTools = [
     run: ({ input }) => net.convertIpv4(input.trim().split("\n")[0]),
   },
   {
-    id: "ip-range", name: "IP Range Tools", icon: "⋯", blurb: "Expand a CIDR block into addresses, or cover an arbitrary range with CIDR blocks.",
+    id: "ip-range", layout: "stack", name: "IP Range Tools", icon: "⋯", blurb: "Expand a CIDR block into addresses, or cover an arbitrary range with CIDR blocks.",
     keywords: ["cidr", "expand", "summarise", "firewall", "acl"],
     actions: ["expand to addresses", "summarise as cidr"],
     input: { sample: "192.168.1.0/29" },
@@ -1172,7 +1197,7 @@ const networkTools = [
       : net.expandRange(input.trim().split("\n")[0])),
   },
   {
-    id: "ipv6", name: "IPv6 Tools", icon: "⁶", blurb: "Expand and compress addresses, or generate a unique local /48 prefix.",
+    id: "ipv6", layout: "stack", name: "IPv6 Tools", icon: "⁶", blurb: "Expand and compress addresses, or generate a unique local /48 prefix.",
     keywords: ["ula", "rfc4193", "compress", "expand", "prefix"],
     actions: ["expand address", "generate unique local prefix"],
     fields: [{ id: "seed", type: "text", label: "MAC address seed", value: "", placeholder: "optional — random when empty", when: ["generate unique local prefix"] }],
@@ -1183,7 +1208,7 @@ const networkTools = [
       : net.expandIpv6(input.trim().split("\n")[0])),
   },
   {
-    id: "url-parse", name: "URL Parser", icon: "⚯", blurb: "Break a URL into every component, with query parameters and path segments listed.",
+    id: "url-parse", layout: "stack", name: "URL Parser", icon: "⚯", blurb: "Break a URL into every component, with query parameters and path segments listed.",
     keywords: ["query string", "parameters", "components", "origin", "host"],
     actions: ["parse url", "build query string"],
     input: {
@@ -1195,7 +1220,7 @@ const networkTools = [
     run: ({ input, action }) => (action === "build query string" ? net.buildQuery(input) : net.parseUrl(input.trim().split("\n")[0])),
   },
   {
-    id: "user-agent", name: "User Agent Parser", icon: "◍", blurb: "Identify the browser, engine, platform, and device class behind a UA string.",
+    id: "user-agent", layout: "stack", name: "User Agent Parser", icon: "◍", blurb: "Identify the browser, engine, platform, and device class behind a UA string.",
     keywords: ["browser", "device", "platform", "detect", "bot"],
     input: { sample: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" },
     output: { filename: "user-agent.txt" },
@@ -1208,7 +1233,7 @@ const networkTools = [
 
 const numberTools = [
   {
-    id: "base-convert", name: "Number Base Converter", icon: "2₁₆", blurb: "Any base from 2 to 36, with arbitrary precision behind the scenes.",
+    id: "base-convert", layout: "stack", name: "Number Base Converter", icon: "2₁₆", blurb: "Any base from 2 to 36, with arbitrary precision behind the scenes.",
     keywords: ["binary", "hex", "octal", "radix", "decimal", "bigint"],
     fields: [
       { id: "from", type: "number", label: "Input base", value: 10, min: 2, max: 36 },
@@ -1224,7 +1249,7 @@ const numberTools = [
     },
   },
   {
-    id: "roman", name: "Roman Numerals", icon: "Ⅳ", blurb: "Convert in either direction, rejecting non-canonical forms.",
+    id: "roman", layout: "stack", name: "Roman Numerals", icon: "Ⅳ", blurb: "Convert in either direction, rejecting non-canonical forms.",
     keywords: ["numerals", "latin", "mmxxvi", "convert"],
     input: { sample: "1994" },
     output: { filename: "roman.txt" },
@@ -1240,7 +1265,7 @@ const numberTools = [
     run: ({ input }) => maths.evaluateLines(input),
   },
   {
-    id: "units", name: "Unit Converter", icon: "⚖", blurb: "Length, mass, data, time, speed, area, volume, pressure, energy, angle, temperature.",
+    id: "units", layout: "stack", name: "Unit Converter", icon: "⚖", blurb: "Length, mass, data, time, speed, area, volume, pressure, energy, angle, temperature.",
     keywords: ["metric", "imperial", "celsius", "bytes", "kilometres", "measure"],
     fields: [
       { id: "category", type: "select", label: "Category", value: "data size", options: [...Object.keys(maths.UNITS), "temperature"], reloads: true },
@@ -1252,7 +1277,7 @@ const numberTools = [
     run: ({ input, options }) => maths.unitReport(input.trim().split("\n")[0], options.category, options.from),
   },
   {
-    id: "percentage", name: "Percentage Calculator", icon: "٪", blurb: "Every common percentage question answered from two numbers.",
+    id: "percentage", layout: "stack", name: "Percentage Calculator", icon: "٪", blurb: "Every common percentage question answered from two numbers.",
     keywords: ["percent", "increase", "decrease", "change", "discount", "tax"],
     fields: [
       { id: "a", type: "number", label: "First number", value: 25, step: "any" },
@@ -1264,7 +1289,7 @@ const numberTools = [
     run: ({ options }) => maths.percentageReport(options.a, options.b),
   },
   {
-    id: "chmod", name: "chmod Calculator", icon: "755", blurb: "Translate between octal modes and rwx notation, including the special bits.",
+    id: "chmod", layout: "stack", name: "chmod Calculator", icon: "755", blurb: "Translate between octal modes and rwx notation, including the special bits.",
     keywords: ["permissions", "unix", "octal", "rwx", "setuid", "sticky"],
     input: { sample: "755", label: "Mode" },
     output: { filename: "chmod.txt" },
@@ -1277,7 +1302,7 @@ const numberTools = [
 
 const timeTools = [
   {
-    id: "datetime", name: "Date and Time", icon: "◷", blurb: "Unix, ISO, RFC 2822, Excel, FILETIME, ISO week, and any time zone at once.",
+    id: "datetime", layout: "stack", name: "Date and Time", icon: "◷", blurb: "Unix, ISO, RFC 2822, Excel, FILETIME, ISO week, and any time zone at once.",
     keywords: ["timestamp", "unix", "epoch", "iso 8601", "timezone", "convert"],
     fields: [
       { id: "unit", type: "select", label: "Numeric input is", value: "auto", options: ["auto", "seconds", "milliseconds", "microseconds", "nanoseconds"] },
@@ -1289,7 +1314,7 @@ const timeTools = [
     run: ({ input, options }) => when.describeMoment(input.trim().split("\n")[0], options.unit, options.timeZone),
   },
   {
-    id: "date-diff", name: "Date Difference", icon: "↦", blurb: "Calendar and absolute distance between two moments, business days included.",
+    id: "date-diff", layout: "stack", name: "Date Difference", icon: "↦", blurb: "Calendar and absolute distance between two moments, business days included.",
     keywords: ["between", "duration", "days", "age", "countdown"],
     fields: [
       { id: "from", type: "text", label: "From", value: "2026-01-01" },
@@ -1301,7 +1326,7 @@ const timeTools = [
     run: ({ options }) => when.dateDifference(options.from, options.to),
   },
   {
-    id: "duration", name: "Duration Converter", icon: "⧗", blurb: "Read 90s, 1h30m, 01:30:00, or PT1H30M and restate it in every unit.",
+    id: "duration", layout: "stack", name: "Duration Converter", icon: "⧗", blurb: "Read 90s, 1h30m, 01:30:00, or PT1H30M and restate it in every unit.",
     keywords: ["seconds", "minutes", "iso 8601", "humanise", "timespan"],
     fields: [{ id: "unit", type: "select", label: "Bare numbers are", value: "seconds", options: Object.keys({ nanoseconds: 0, microseconds: 0, milliseconds: 0, seconds: 0, minutes: 0, hours: 0, days: 0, weeks: 0 }) }],
     input: { sample: "1h30m", label: "Duration" },
@@ -1310,7 +1335,7 @@ const timeTools = [
     run: ({ input, options }) => when.convertDuration(input.trim().split("\n")[0], options.unit),
   },
   {
-    id: "cron", name: "Cron Expressions", icon: "*/5", blurb: "Explain a schedule in words and list the next runs, aliases included.",
+    id: "cron", layout: "stack", name: "Cron Expressions", icon: "*/5", blurb: "Explain a schedule in words and list the next runs, aliases included.",
     keywords: ["crontab", "schedule", "job", "next run", "explain"],
     fields: [{ id: "runs", type: "number", label: "Runs to list", value: 8, min: 1, max: 50 }],
     input: { sample: "0 9 * * 1-5", label: "Cron expression" },
@@ -1398,7 +1423,7 @@ const fileTools = [
     },
   },
   {
-    id: "archive", name: "Archive Inspector", icon: "⛁", blurb: "List the contents of any ZIP, DOCX, XLSX, PPTX, JAR, or EPUB without extracting it.",
+    id: "archive", layout: "stack", name: "Archive Inspector", icon: "⛁", blurb: "List the contents of any ZIP, DOCX, XLSX, PPTX, JAR, or EPUB without extracting it.",
     keywords: ["zip", "unzip", "contents", "docx", "jar", "epub"],
     actions: ["list entries", "extract a file"],
     fields: [{ id: "entry", type: "text", label: "Entry path", value: "", placeholder: "word/document.xml", when: ["extract a file"] }],
@@ -1421,7 +1446,7 @@ const fileTools = [
     },
   },
   {
-    id: "hexdump", name: "File Hex Dump", icon: "⦿", blurb: "Offsets, hex bytes, and ASCII for any file — handy for spotting magic numbers.",
+    id: "hexdump", layout: "stack", name: "File Hex Dump", icon: "⦿", blurb: "Offsets, hex bytes, and ASCII for any file — handy for spotting magic numbers.",
     keywords: ["binary", "bytes", "magic number", "inspect", "xxd"],
     fields: [{ id: "limit", type: "number", label: "Bytes to show", value: 2048, min: 16, max: 65536, step: 16 }],
     input: { accept: "*/*", hidden: true },
@@ -1471,7 +1496,7 @@ function detectSignature(bytes) {
 
 const referenceTools = [
   {
-    id: "mime", name: "MIME Types", icon: "◇", blurb: "Look up a media type by extension, or an extension by media type.",
+    id: "mime", layout: "stack", name: "MIME Types", icon: "◇", blurb: "Look up a media type by extension, or an extension by media type.",
     keywords: ["content type", "media type", "extension", "header"],
     input: { sample: "webp", label: "Extension or media type" },
     output: { filename: "mime.txt" },
@@ -1479,7 +1504,7 @@ const referenceTools = [
     run: ({ input }) => reference.lookupMime(input.trim().split("\n")[0]),
   },
   {
-    id: "http-status", name: "HTTP Status Codes", icon: "418", blurb: "Search every status code by number, name, or description.",
+    id: "http-status", layout: "stack", name: "HTTP Status Codes", icon: "418", blurb: "Search every status code by number, name, or description.",
     keywords: ["404", "500", "response", "rest", "api"],
     input: { sample: "429", label: "Code or keyword" },
     output: { filename: "status.txt" },
@@ -1487,7 +1512,7 @@ const referenceTools = [
     run: ({ input }) => reference.lookupStatus(input.trim().split("\n")[0]),
   },
   {
-    id: "keycode", name: "Key Codes", icon: "⌨", blurb: "Map between keyCode, event.key, and event.code — press a key to identify it.",
+    id: "keycode", layout: "stack", name: "Key Codes", icon: "⌨", blurb: "Map between keyCode, event.key, and event.code — press a key to identify it.",
     keywords: ["keyboard", "keydown", "event", "javascript", "shortcut"],
     input: { sample: "", label: "Key name or code", placeholder: "Press a key in this box, or type a code" },
     output: { filename: "keycodes.txt" },
@@ -1496,7 +1521,7 @@ const referenceTools = [
     run: ({ input }) => reference.lookupKeyCode(input.trim().split("\n")[0]),
   },
   {
-    id: "ports", name: "Well-Known Ports", icon: "⑃", blurb: "Which service runs where, from FTP to MongoDB.",
+    id: "ports", layout: "stack", name: "Well-Known Ports", icon: "⑃", blurb: "Which service runs where, from FTP to MongoDB.",
     keywords: ["tcp", "service", "network", "firewall", "default"],
     input: { sample: "", label: "Port or service", placeholder: "5432, redis, https…" },
     output: { filename: "ports.txt" },
@@ -1529,6 +1554,10 @@ export const TOOLS = CATEGORIES.flatMap((category) => category.tools.map((tool) 
   fields: tool.fields ?? [],
   input: tool.input ?? {},
   output: tool.output ?? {},
+  // Two inputs always mean a comparison; everything else keeps its declared
+  // geometry, or the default side-by-side split.
+  layout: tool.secondary ? "compare" : tool.layout ?? "split",
+  cards: Boolean(tool.cards),
 })));
 
 export const TOOL_CATEGORIES = CATEGORIES.map((category) => category.name);

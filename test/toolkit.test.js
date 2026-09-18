@@ -13,7 +13,7 @@ import * as reference from "../public/lib/reference.js";
 /* ---------------------------------------------------------------- text -- */
 
 test("case conversion covers every common convention", () => {
-  const all = text.allCases("helloWorld example-text");
+  const all = text.allCases("helloWorld example-text").text;
   assert.match(all, /camel\s+helloWorldExampleText/);
   assert.match(all, /snake\s+hello_world_example_text/);
   assert.match(all, /kebab\s+hello-world-example-text/);
@@ -73,10 +73,10 @@ test("classic ciphers are reversible", () => {
 });
 
 test("text statistics count words, sentences, and frequencies", () => {
-  const report = text.textStatistics("The quick brown fox. The lazy dog!");
+  const report = text.textStatistics("The quick brown fox. The lazy dog!").text;
   assert.match(report, /Words\s+7/);
   assert.match(report, /Sentences\s+2/);
-  assert.match(report, /2 {2}the/);
+  assert.match(report, /the\s+2/);
 });
 
 /* -------------------------------------------------------------- crypto -- */
@@ -135,9 +135,9 @@ test("password generation honours the requested sets and length", () => {
 });
 
 test("password analysis separates weak from strong", () => {
-  assert.match(crypt.analyzePassword("password123"), /Verdict\s+Very weak/);
-  assert.match(crypt.analyzePassword("password123"), /common-password list/);
-  assert.match(crypt.analyzePassword("7#kQz!mVr2$Lp9Xw&Tb"), /Verdict\s+Very strong/);
+  assert.match(crypt.analyzePassword("password123").text, /Verdict\s+Very weak/);
+  assert.match(crypt.analyzePassword("password123").text, /common-password list/);
+  assert.match(crypt.analyzePassword("7#kQz!mVr2$Lp9Xw&Tb").text, /Verdict\s+Very strong/);
 });
 
 /* ----------------------------------------------------------------- ids -- */
@@ -155,24 +155,24 @@ test("generated UUIDs carry the right version and variant", () => {
     assert.equal(Number(value[14]), version);
     assert.match(value[19], /[89ab]/);
   }
-  assert.match(ids.inspectUuid(ids.uuidV7()), /Version {4}7 — Unix epoch time ordered/);
-  assert.match(ids.inspectUuid("00000000-0000-0000-0000-000000000000"), /Nil UUID/);
+  assert.match(ids.inspectUuid(ids.uuidV7()).text, /Version {4}7 — Unix epoch time ordered/);
+  assert.match(ids.inspectUuid("00000000-0000-0000-0000-000000000000").text, /Nil UUID/);
 });
 
 test("ULIDs sort by time and decode their timestamp", () => {
   const value = ids.ulid(1_700_000_000_000);
   assert.equal(value.length, 26);
-  assert.match(ids.inspectUlid(value), /2023-11-14T22:13:20\.000Z/);
-  assert.throws(() => ids.inspectUlid("too-short"), /26 Crockford Base32 characters/);
+  assert.match(ids.inspectUlid(value).text, /2023-11-14T22:13:20\.000Z/);
+  assert.throws(() => ids.inspectUlid("too-short").text, /26 Crockford Base32 characters/);
 });
 
 test("MAC addresses are generated locally administered and decoded correctly", () => {
   const address = ids.macAddress({ prefix: "00:1A:2B" });
   assert.match(address, /^00:1A:2B/);
-  const report = ids.inspectMac("00:1A:2B:3C:4D:5E");
-  assert.match(report, /Cisco {7}001a\.2b3c\.4d5e/);
+  const report = ids.inspectMac("00:1A:2B:3C:4D:5E").text;
+  assert.match(report, /Cisco\s+001a\.2b3c\.4d5e/);
   assert.match(report, /Universally administered/);
-  assert.match(report, /EUI-64 {6}02:1a:2b:ff:fe:3c:4d:5e/);
+  assert.match(report, /EUI-64\s+02:1a:2b:ff:fe:3c:4d:5e/);
   assert.throws(() => ids.inspectMac("zz"), /six bytes/);
 });
 
@@ -192,34 +192,35 @@ test("colour parsing accepts every common notation", () => {
 
 test("contrast matches the WCAG boundary values", () => {
   assert.equal(color.contrastRatio(color.parseColor("#000"), color.parseColor("#fff")).toFixed(0), "21");
-  assert.match(color.checkContrast("#767676", "#ffffff"), /Ratio\s+4\.54:1/);
-  assert.match(color.checkContrast("#767676", "#ffffff"), /AA {2}normal text \(4\.5:1\) {3}PASS/);
-  assert.match(color.checkContrast("#999999", "#ffffff"), /AA {2}normal text \(4\.5:1\) {3}FAIL/);
+  assert.match(color.checkContrast("#767676", "#ffffff").text, /Ratio\s+4\.54:1/);
+  assert.match(color.checkContrast("#767676", "#ffffff").text, /AA normal text\s+PASS/);
+  assert.match(color.checkContrast("#999999", "#ffffff").text, /AA normal text\s+FAIL/);
 });
 
 test("palettes produce the expected number of swatches", () => {
-  assert.equal(color.buildPalette("#3b82f6", "triadic").split("\n").length, 3);
-  assert.equal(color.buildPalette("#3b82f6", "shades").split("\n").length, 11);
+  assert.equal(color.buildPalette("#3b82f6", "triadic").rows.length, 3);
+  assert.equal(color.buildPalette("#3b82f6", "shades").rows.length, 11);
+  assert.match(color.buildPalette("#3b82f6", "triadic").text, /^base\s+#3b82f6/);
   assert.throws(() => color.buildPalette("#3b82f6", "nope"), /Unknown palette scheme/);
 });
 
 /* ------------------------------------------------------------- network -- */
 
 test("subnet calculations are correct for a /26", () => {
-  const report = net.subnetReport("192.168.1.130/26");
+  const report = net.subnetReport("192.168.1.130/26").text;
   assert.match(report, /Network\s+192\.168\.1\.128\/26/);
   assert.match(report, /Broadcast\s+192\.168\.1\.191/);
   assert.match(report, /First host\s+192\.168\.1\.129/);
   assert.match(report, /Usable hosts\s+62/);
   assert.match(report, /Scope\s+Private \(RFC 1918\)/);
-  assert.throws(() => net.subnetReport("192.168.1.1/33"), /between 0 and 32/);
+  assert.throws(() => net.subnetReport("192.168.1.1/33").text, /between 0 and 32/);
 });
 
 test("IPv4 notation is detected rather than guessed", () => {
   for (const notation of ["192.168.1.1", "3232235777", "0xC0A80101", "11000000.10101000.00000001.00000001"]) {
-    assert.match(net.convertIpv4(notation), /Dotted decimal {2}192\.168\.1\.1/, notation);
+    assert.match(net.convertIpv4(notation).text, /Dotted decimal {2}192\.168\.1\.1/, notation);
   }
-  assert.match(net.convertIpv4("10.0.0.1"), /Dotted decimal {2}10\.0\.0\.1/);
+  assert.match(net.convertIpv4("10.0.0.1").text, /Dotted decimal {2}10\.0\.0\.1/);
   assert.throws(() => net.convertIpv4("300.1.1.1"), /larger than 255/);
 });
 
@@ -230,26 +231,26 @@ test("IP ranges expand and summarise", () => {
 });
 
 test("IPv6 expansion and compression follow RFC 5952", () => {
-  assert.match(net.expandIpv6("2001:db8::1"), /Expanded\s+2001:0db8:0000:0000:0000:0000:0000:0001/);
-  assert.match(net.expandIpv6("::ffff:192.168.1.1"), /Compressed\s+::ffff:c0a8:101/);
-  assert.throws(() => net.expandIpv6("1::2::3"), /only contain one/);
+  assert.match(net.expandIpv6("2001:db8::1").text, /Expanded\s+2001:0db8:0000:0000:0000:0000:0000:0001/);
+  assert.match(net.expandIpv6("::ffff:192.168.1.1").text, /Compressed\s+::ffff:c0a8:101/);
+  assert.throws(() => net.expandIpv6("1::2::3").text, /only contain one/);
 });
 
 test("URL parsing lists every component and repeated parameters", () => {
-  const report = net.parseUrl("https://user@example.com:8443/a/b%20c?x=1&y=2&x=3#frag");
+  const report = net.parseUrl("https://user@example.com:8443/a/b%20c?x=1&y=2&x=3#frag").text;
   assert.match(report, /Hostname\s+example\.com/);
   assert.match(report, /Port\s+8443/);
   assert.match(report, /Query parameters \(3\)/);
-  assert.match(report, /1 {2}b c/);
-  assert.throws(() => net.parseUrl("not a url"), /not an absolute URL/);
+  assert.match(report, /^1\s+b c$/m);
+  assert.throws(() => net.parseUrl("not a url").text, /not an absolute URL/);
 });
 
 test("user agents resolve to a browser and platform", () => {
-  const report = net.parseUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+  const report = net.parseUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36").text;
   assert.match(report, /Browser\s+Chrome 120\.0\.0\.0/);
   assert.match(report, /Engine\s+Blink/);
   assert.match(report, /macOS 10\.15\.7/);
-  assert.match(net.parseUserAgent("Googlebot/2.1 (+http://www.google.com/bot.html)"), /Bot or crawler/);
+  assert.match(net.parseUserAgent("Googlebot/2.1 (+http://www.google.com/bot.html)").text, /Bot or crawler/);
 });
 
 /* --------------------------------------------------------------- maths -- */
@@ -267,7 +268,7 @@ test("base conversion covers 2 to 36 with big integers", () => {
   assert.equal(maths.convertBase("255", 10, 16), "ff");
   assert.equal(maths.convertBase("ff", 16, 2), "11111111");
   assert.equal(maths.convertBase("123456789012345678901234567890", 10, 16), "18ee90ff6c373e0ee4e3f0ad2");
-  assert.match(maths.baseReport("255", 10), /Hex \(16\)\s+FF/);
+  assert.match(maths.baseReport("255", 10).text, /Hex \(16\)\s+FF/);
   assert.throws(() => maths.convertBase("9", 8, 10), /not a valid digit in base 8/);
 });
 
@@ -287,21 +288,21 @@ test("unit conversion is exact for binary and decimal data sizes", () => {
 });
 
 test("chmod translates octal and symbolic modes", () => {
-  assert.match(maths.chmodReport("755"), /Symbolic\s+rwxr-xr-x/);
-  assert.match(maths.chmodReport("rwxr-xr-x"), /Octal\s+755/);
-  assert.match(maths.chmodReport("rwsr-xr-t"), /Special {2}5 {2}setuid, sticky bit/);
+  assert.match(maths.chmodReport("755").text, /Symbolic\s+rwxr-xr-x/);
+  assert.match(maths.chmodReport("rwxr-xr-x").text, /Octal\s+755/);
+  assert.match(maths.chmodReport("rwsr-xr-t").text, /Special bits\s+5 {2}setuid, sticky bit/);
   assert.throws(() => maths.chmodReport("999"), /Enter a mode/);
 });
 
 /* ---------------------------------------------------------------- time -- */
 
 test("moments report every representation", () => {
-  const report = when.describeMoment("1789721653", "seconds", "UTC");
+  const report = when.describeMoment("1789721653", "seconds", "UTC").text;
   assert.match(report, /ISO 8601 \(UTC\)\s+2026-09-18T08:54:13\.000Z/);
   assert.match(report, /Day of week\s+Friday/);
   assert.match(report, /ISO week\s+2026-W38/);
   assert.match(report, /Quarter\s+Q3/);
-  assert.match(when.describeMoment("0", "seconds"), /1970-01-01T00:00:00\.000Z/);
+  assert.match(when.describeMoment("0", "seconds").text, /1970-01-01T00:00:00\.000Z/);
   assert.throws(() => when.parseMoment("never"), /not a date we can read/);
 });
 
@@ -310,18 +311,18 @@ test("durations parse from every common notation", () => {
   assert.equal(when.parseDuration("1h30m"), 5_400_000);
   assert.equal(when.parseDuration("01:30:00"), 5_400_000);
   assert.equal(when.parseDuration("PT1H30M"), 5_400_000);
-  assert.match(when.convertDuration("1h30m"), /minutes\s+90/);
-  assert.match(when.convertDuration("1h30m"), /ISO 8601\s+PT1H30M/);
+  assert.match(when.convertDuration("1h30m").text, /minutes\s+90/);
+  assert.match(when.convertDuration("1h30m").text, /ISO 8601\s+PT1H30M/);
   assert.throws(() => when.parseDuration("soon"), /not a duration we can read/);
 });
 
 test("cron expressions are explained and projected forward", () => {
   const from = new Date("2026-09-18T00:00:00Z");
-  const weekdays = when.describeCron("0 9 * * 1-5", { from, runs: 3 });
-  assert.match(weekdays, /2026-09-18T09:00:00Z {2}Friday/);
-  assert.match(weekdays, /2026-09-21T09:00:00Z {2}Monday/);
-  assert.match(when.describeCron("@daily", { from, runs: 1 }), /2026-09-19T00:00:00Z/);
-  assert.match(when.describeCron("0 0 29 2 *", { from, runs: 1 }), /2028-02-29T00:00:00Z/);
+  const weekdays = when.describeCron("0 9 * * 1-5", { from, runs: 3 }).text;
+  assert.match(weekdays, /Friday\s+2026-09-18T09:00:00Z/);
+  assert.match(weekdays, /Monday\s+2026-09-21T09:00:00Z/);
+  assert.match(when.describeCron("@daily", { from, runs: 1 }).text, /2026-09-19T00:00:00Z/);
+  assert.match(when.describeCron("0 0 29 2 *", { from, runs: 1 }).text, /2028-02-29T00:00:00Z/);
   assert.throws(() => when.parseCron("a b c"), /five fields/);
   assert.throws(() => when.parseCron("60 * * * *"), /out of range for the minute field/);
 });
@@ -409,11 +410,11 @@ test("meta tags cover primary, Open Graph, and Twitter", () => {
 /* ----------------------------------------------------------- reference -- */
 
 test("reference lookups find codes and types", () => {
-  assert.match(reference.lookupMime("webp"), /image\/webp/);
-  assert.match(reference.lookupMime("zzz"), /No match/);
-  assert.match(reference.lookupStatus("429"), /Too Many Requests/);
-  assert.match(reference.lookupStatus("teapot"), /418/);
-  assert.match(reference.lookupKeyCode("13"), /Name\s+Enter/);
-  assert.match(reference.lookupKeyCode("65"), /event\.code\s+KeyA/);
-  assert.match(reference.lookupPort("5432"), /PostgreSQL/);
+  assert.match(reference.lookupMime("webp").text, /image\/webp/);
+  assert.match(reference.lookupMime("zzz").text, /Nothing matches/);
+  assert.match(reference.lookupStatus("429").text, /Too Many Requests/);
+  assert.match(reference.lookupStatus("teapot").text, /418/);
+  assert.match(reference.lookupKeyCode("13").text, /Name\s+Enter/);
+  assert.match(reference.lookupKeyCode("65").text, /event\.code\s+KeyA/);
+  assert.match(reference.lookupPort("5432").text, /PostgreSQL/);
 });

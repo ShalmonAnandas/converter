@@ -3,6 +3,7 @@
 
 import { randomBytes, bytesToHex } from "./bytes.js";
 import { digestBytes } from "./crypto.js";
+import { report } from "./report.js";
 
 /* ---------------------------------------------------------------- ipv4 --- */
 
@@ -91,8 +92,7 @@ export function subnetReport(input) {
     ["Hex", `0x${(value >>> 0).toString(16).padStart(8, "0").toUpperCase()}`],
     ["ARPA", `${[0, 8, 16, 24].map((shift) => (value >>> shift) & 255).join(".")}.in-addr.arpa`],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }
 
 export function convertIpv4(input) {
@@ -117,8 +117,7 @@ export function convertIpv4(input) {
     ["ARPA", `${[...octets].reverse().join(".")}.in-addr.arpa`],
     ["Scope", describeScope(value)],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }
 
 export function expandRange(input, { limit = 4096 } = {}) {
@@ -175,22 +174,16 @@ export async function generateUla(macAddress = "") {
   const digest = await digestBytes(material, "SHA-1");
   const globalId = bytesToHex(digest.subarray(digest.length - 5));
   const prefix = `fd${globalId.slice(0, 2)}:${globalId.slice(2, 6)}:${globalId.slice(6, 10)}`;
-  const rows = [
+  return report([
     ["Global ID", globalId],
     ["/48 prefix", `${prefix}::/48`],
     ["First /64", `${prefix}:0000::/64`],
-    ["Sample /64s", ""],
-  ];
-  const subnets = Array.from({ length: 5 }, (_, index) => `  ${prefix}:${index.toString(16).padStart(4, "0")}::/64`);
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return [
-    ...rows.slice(0, 3).map(([label, item]) => `${label.padEnd(width)}  ${item}`),
     "",
     "Sample /64 subnets",
-    ...subnets,
+    ...Array.from({ length: 5 }, (_, index) => [`Subnet ${index}`, `${prefix}:${index.toString(16).padStart(4, "0")}::/64`]),
     "",
-    "Unique local addresses (RFC 4193) are private to your organisation and are not routed on the public internet.",
-  ].join("\n");
+    ["Note", "Unique local addresses (RFC 4193) are private to your organisation and are not routed on the public internet."],
+  ]);
 }
 
 export function expandIpv6(input) {
@@ -224,8 +217,7 @@ export function expandIpv6(input) {
     ["Groups", normalized.map((group) => `0x${group}`).join(" ")],
     ["ARPA", `${normalized.join("").split("").reverse().join(".")}.ip6.arpa`],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`).join("\n");
+  return report(rows);
 }
 
 function compressIpv6(groups) {
@@ -265,16 +257,15 @@ export function parseUrl(input) {
     ["Search", url.search || "—"],
     ["Hash", url.hash || "—"],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  const lines = rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`);
   const parameters = [...url.searchParams.entries()];
   if (parameters.length) {
-    const keyWidth = Math.max(...parameters.map(([key]) => key.length));
-    lines.push("", `Query parameters (${parameters.length})`, ...parameters.map(([key, value]) => `  ${key.padEnd(keyWidth)}  ${value}`));
+    rows.push("", `Query parameters (${parameters.length})`, ...parameters.map(([key, value]) => [key, value]));
   }
   const segments = url.pathname.split("/").filter(Boolean);
-  if (segments.length) lines.push("", `Path segments (${segments.length})`, ...segments.map((segment, index) => `  ${index}  ${decodeURIComponent(segment)}`));
-  return lines.join("\n");
+  if (segments.length) {
+    rows.push("", `Path segments (${segments.length})`, ...segments.map((segment, index) => [String(index), decodeURIComponent(segment)]));
+  }
+  return report(rows);
 }
 
 export function buildQuery(input) {
@@ -336,10 +327,9 @@ export function parseUserAgent(input) {
     ["Touch hints", isMobile ? "Likely" : "Unlikely"],
     ["Raw length", `${agent.length} characters`],
   ];
-  const width = Math.max(...rows.map(([label]) => label.length));
-  return [
-    ...rows.map(([label, item]) => `${label.padEnd(width)}  ${item}`),
+  return report([
+    ...rows,
     "",
-    "User-Agent strings are self-reported and easily spoofed — prefer feature detection.",
-  ].join("\n");
+    ["Note", "User-Agent strings are self-reported and easily spoofed — prefer feature detection."],
+  ]);
 }

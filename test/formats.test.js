@@ -227,3 +227,27 @@ test("CSV converts to JSON, back, and to a Markdown table", () => {
   assert.equal(jsonToCsv(JSON.stringify(records)), "id,name,active\n1,Ada,true\n2,Lin,false");
   assert.match(csvToMarkdown("id,name\n1,Ada"), /^\| id {2}\| name \|$/m);
 });
+
+/* -------------------------------------------------------------- report -- */
+
+test("reports render as aligned text and as structured rows", async () => {
+  const { report } = await import("../public/lib/report.js");
+  const result = report([
+    ["Short", "one"],
+    ["A longer label", "two"],
+    "",
+    "A heading",
+    ["Tone", "three", "good"],
+  ]);
+  assert.equal(result.text, "Short           one\nA longer label  two\n\nA heading\nTone            three");
+  assert.deepEqual(result.rows.map((row) => row.type), ["row", "row", "blank", "heading", "row"]);
+  assert.equal(result.rows[4].tone, "good");
+  assert.equal(report([]).text, "");
+});
+
+test("report values that span lines stay aligned", async () => {
+  const { report } = await import("../public/lib/report.js");
+  const result = report([["Key", "first\nsecond"]]);
+  assert.equal(result.text, "Key  first\n     second");
+  assert.equal(result.rows[0].value, "first\nsecond");
+});

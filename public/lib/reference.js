@@ -1,5 +1,7 @@
 // Lookup tables developers keep a tab open for.
 
+import { report } from "./report.js";
+
 export const MIME_TYPES = {
   aac: "audio/aac", abw: "application/x-abiword", apng: "image/apng", arc: "application/x-freearc", avif: "image/avif", avi: "video/x-msvideo",
   azw: "application/vnd.amazon.ebook", bin: "application/octet-stream", bmp: "image/bmp", bz: "application/x-bzip", bz2: "application/x-bzip2",
@@ -24,9 +26,8 @@ export function lookupMime(query) {
   const term = query.trim().toLowerCase().replace(/^[.*]/, "");
   if (!term) throw new Error("Enter a file extension or media type");
   const matches = Object.entries(MIME_TYPES).filter(([extension, type]) => extension === term || type === term || extension.includes(term) || type.includes(term));
-  if (!matches.length) return `No match for "${query}". Unknown binary content should use application/octet-stream.`;
-  const width = Math.max(...matches.map(([extension]) => extension.length));
-  return matches.map(([extension, type]) => `.${extension.padEnd(width)}  ${type}`).join("\n");
+  if (!matches.length) return report([["No match", `Nothing matches "${query}". Unknown binary content should use application/octet-stream.`]]);
+  return report(matches.map(([extension, type]) => [`.${extension}`, type]));
 }
 
 export const HTTP_STATUS = {
@@ -99,9 +100,10 @@ export function lookupStatus(query) {
   const matches = term
     ? entries.filter(([code, [name, description]]) => code.startsWith(term) || name.toLowerCase().includes(term) || description.toLowerCase().includes(term))
     : entries;
-  if (!matches.length) return `No HTTP status matches "${query}".`;
+  if (!matches.length) return report([["No match", `No HTTP status matches "${query}".`]]);
   const classOf = (code) => ({ 1: "Informational", 2: "Success", 3: "Redirection", 4: "Client error", 5: "Server error" })[code[0]];
-  return matches.map(([code, [name, description]]) => `${code}  ${name}\n     ${classOf(code)} · ${description}`).join("\n\n");
+  const tone = (code) => (code[0] === "2" ? "good" : code[0] === "4" || code[0] === "5" ? "bad" : undefined);
+  return report(matches.map(([code, [name, description]]) => [code, `${name} — ${classOf(code)}. ${description}`, tone(code)]));
 }
 
 export const KEY_CODES = [
@@ -116,26 +118,26 @@ export function lookupKeyCode(query) {
   const term = query.trim();
   if (!term) {
     const rows = [...KEY_CODES, ...Array.from({ length: 12 }, (_, index) => [112 + index, `F${index + 1}`])].sort((a, b) => a[0] - b[0]);
-    return `Press a key in the field above, or search by name.\n\n${rows.map(([code, name]) => `${String(code).padStart(3)}  ${name}`).join("\n")}`;
+    return report(["Press a key in the input above, or search by name.", "", ...rows.map(([code, name]) => [String(code), name])]);
   }
   if (/^\d+$/.test(term)) {
     const code = Number(term);
     const known = KEY_CODES.find(([value]) => value === code);
     const printable = code >= 48 && code <= 90 ? String.fromCharCode(code) : null;
     const functionKey = code >= 112 && code <= 123 ? `F${code - 111}` : null;
-    return [
-      `keyCode       ${code}`,
-      `Name          ${known?.[1] ?? functionKey ?? printable ?? "unassigned"}`,
-      `event.key     ${printable ? printable.toLowerCase() : known?.[1] ?? functionKey ?? "—"}`,
-      `event.code    ${printable ? (/\d/.test(printable) ? `Digit${printable}` : `Key${printable}`) : known?.[1] ?? functionKey ?? "—"}`,
-      `Hex           0x${code.toString(16).toUpperCase()}`,
+    return report([
+      ["keyCode", String(code), "accent"],
+      ["Name", known?.[1] ?? functionKey ?? printable ?? "unassigned"],
+      ["event.key", printable ? printable.toLowerCase() : known?.[1] ?? functionKey ?? "—"],
+      ["event.code", printable ? (/\d/.test(printable) ? `Digit${printable}` : `Key${printable}`) : known?.[1] ?? functionKey ?? "—"],
+      ["Hex", `0x${code.toString(16).toUpperCase()}`],
       "",
-      "keyCode is deprecated — prefer event.key for characters and event.code for physical keys.",
-    ].join("\n");
+      ["Note", "keyCode is deprecated — prefer event.key for characters and event.code for physical keys."],
+    ]);
   }
   const matches = KEY_CODES.filter(([, name]) => name.toLowerCase().includes(term.toLowerCase()));
-  if (!matches.length) return `No key matches "${query}".`;
-  return matches.map(([code, name]) => `${String(code).padStart(3)}  ${name}`).join("\n");
+  if (!matches.length) return report([["No match", `No key matches "${query}".`]]);
+  return report(matches.map(([code, name]) => [String(code), name]));
 }
 
 export const WELL_KNOWN_PORTS = [
@@ -153,6 +155,6 @@ export function lookupPort(query) {
   const matches = term
     ? WELL_KNOWN_PORTS.filter(([port, service]) => String(port).startsWith(term) || service.toLowerCase().includes(term))
     : WELL_KNOWN_PORTS;
-  if (!matches.length) return `No well-known service matches "${query}". Ports 49152–65535 are ephemeral and unassigned.`;
-  return matches.map(([port, service]) => `${String(port).padStart(5)}  ${service}`).join("\n");
+  if (!matches.length) return report([["No match", `No well-known service matches "${query}". Ports 49152–65535 are ephemeral and unassigned.`]]);
+  return report(matches.map(([port, service]) => [String(port), service]));
 }
