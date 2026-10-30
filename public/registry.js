@@ -1350,7 +1350,7 @@ const timeTools = [
 const fileTools = [
   {
     id: "audit-logs", name: "Audit Log Viewer", icon: "≡", blurb: "Explore audit logs as a timeline and inspect each request and response.",
-    keywords: ["audit", "logs", "overflow", "smartnow", "xlsx", "journey", "api"],
+    keywords: ["audit", "logs", "overflow", "smartnow", "xlsx", "csv", "journey", "api"],
     input: {}, output: {}, run: () => "",
   },
   {

@@ -1173,7 +1173,7 @@ dialog#commandDialog::backdrop { background: #0009; backdrop-filter: blur(4px); 
 .audit-file { cursor:pointer; white-space:nowrap; }
 .audit-settings { display:flex; gap:14px; align-items:end; flex-wrap:wrap; }
 .audit-settings label { display:grid; gap:5px; color:var(--text-muted); font-size:.8rem; }
-.audit-settings input, .audit-search { color:var(--text); background:var(--surface-sunken); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:9px 10px; }
+.audit-settings input, .audit-settings select, .audit-search { color:var(--text); background:var(--surface-sunken); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:9px 10px; }
 .audit-settings input { width:105px; }
 .audit-muted { color:var(--text-muted); font-size:.85rem; }
 .audit-message { color:var(--text-muted); font-size:.86rem; min-height:1.4em; margin:14px 0; }

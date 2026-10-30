@@ -88,3 +88,38 @@ test('JSON viewer preserves large numbers, duplicate keys, strings and raw non-J
   assert.deepEqual(JSON.parse(result.text), JSON.parse(source));
   assert.deepEqual(formatPayload('not json'), { text: 'not json', valid: false });
 });
+
+test('CSV viewer keeps complete oversized fields, quoted JSON, CRLF and scientific IDs', async () => {
+  const { readAuditCsv } = await import('../public/lib/audit-log.js');
+  const { serializeRows } = await import('../public/lib/csv.js');
+  const h = ['Audit_Log_ID','Journey_Ref_No','Operation_Type','FE_Request','Created_On'];
+  const payload = JSON.stringify({ text: 'x'.repeat(40000), newline: 'a\r\nb', number: 1 });
+  const csv = '\ufeff' + serializeRows([h, ['1','9.66796E+11','Save',payload,'2026-10-30 10:00:00+05:30'], ['2','003','Next','value','']], ',', {protect:false, eol:'\r\n'});
+  const parsed = readAuditCsv(csv);
+  assert.equal(parsed.records.length, 2);
+  assert.equal(parsed.continuations, 0);
+  assert.equal(parsed.records[0][1], '9.66796E+11');
+  assert.equal(parsed.records[0][3], payload);
+  assert.equal(parsed.records[1][1], '003');
+});
+
+test('CSV reconstructs shifted fragments and handles a single offset continuation', async () => {
+  const { readAuditCsv } = await import('../public/lib/audit-log.js');
+  const h = 'Audit_Log_ID,Journey_Ref_No,FE_Request,FE_Response\r\n';
+  const parsed = readAuditCsv(h + '1,9.66796E+11,abcde,\r\nfghij,,,\r\n,klmno\r\npq,answer,,\r\n', { chunkSize: 5 });
+  assert.deepEqual(parsed.records, [['1','9.66796E+11','abcdefghijklmnopq','answer']]);
+  assert.equal(parsed.continuations, 3);
+  assert.throws(() => readAuditCsv(h + '1,2,abcde,\n,x,y,\n', { chunkSize: 5 }), /ambiguous/);
+});
+
+test('CSV encoding is detected without replacing invalid UTF-8 bytes', async () => {
+  const { decodeAuditCsv } = await import('../public/lib/audit-log.js');
+  assert.equal(decodeAuditCsv(Uint8Array.from([0x63,0x61,0x66,0xe9])).text, 'café');
+  assert.equal(decodeAuditCsv(Uint8Array.from([0x63,0x61,0x66,0xc3,0xa9])).encoding, 'UTF-8');
+  assert.throws(() => decodeAuditCsv(Uint8Array.from([0xff]), 'utf-8'));
+});
+
+test('CSV parsing retains a carriage return inside a quoted final field', async () => {
+  const { parseCsv } = await import('../public/lib/csv.js');
+  assert.deepEqual(parseCsv('a,"last\r"\r\n'), [['a','last\r']]);
+});

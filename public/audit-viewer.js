@@ -1,4 +1,4 @@
-import { readAuditWorkbook, auditTimeline, formatPayload } from './lib/audit-log.js';
+import { readAuditWorkbook, readAuditCsv, decodeAuditCsv, auditTimeline, formatPayload } from './lib/audit-log.js';
 
 const PAYLOADS = [ ['FE_Request', 'FE request'], ['FE_Response', 'FE response'], ['Bank_API_Request', 'BE request'], ['Bank_API_Response', 'BE response'] ];
 const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -7,12 +7,13 @@ const shown = value => value ? escape(value) : '<span class="audit-muted">—</s
 export function createAuditViewer(root) {
   root.innerHTML = `
     <div class="audit-upload">
-      <div><h2>Explore an audit export</h2><p>Choose an XLSX file to view its API calls. Your data stays in this browser.</p></div>
-      <label class="button primary audit-file">Open XLSX<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></label>
+      <div><h2>Explore an audit export</h2><p>Choose an XLSX or CSV file to view its API calls. Your data stays in this browser.</p></div>
+      <label class="button primary audit-file">Open XLSX or CSV<input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden></label>
     </div>
     <div class="audit-settings">
-      <label>Worksheet <input data-sheet type="number" value="1" min="1" step="1"></label>
-      <label>Chunk size <input data-chunk type="number" value="32759" min="1" step="1"></label>
+      <label data-sheet-setting>Worksheet <input data-sheet type="number" value="1" min="1" step="1"></label>
+      <label>Continuation chunk size <input data-chunk type="number" value="32759" min="1" step="1"></label>
+      <label data-encoding-setting hidden>CSV encoding <select data-encoding><option value="auto">Auto (UTF-8 / Windows-1252)</option><option value="utf-8">UTF-8</option><option value="windows-1252">Windows-1252</option></select></label>
       <button class="button tiny" data-reload type="button">Reload</button>
       <span data-filename class="audit-muted">No file selected</span>
     </div>
@@ -62,19 +63,31 @@ export function createAuditViewer(root) {
     renderTimeline();
   }
   async function load() {
-    if (!file) { message('Choose an XLSX file first.'); return; }
+    if (!file) { message('Choose an XLSX or CSV file first.'); return; }
     const token = ++generation;
     records = []; header = []; selected = null; $('[data-workspace]').hidden = true;
-    if (!/\.xlsx$/i.test(file.name)) { message('Please choose an XLSX file.'); return; }
+    if (!/\.(xlsx|csv)$/i.test(file.name)) { message('Please choose an XLSX or CSV file.'); return; }
     if (file.size > 64 * 1024 * 1024) { message('The file exceeds the 64 MB limit.'); return; }
-    message('Reading workbook locally…');
+    const isCsv = /\.csv$/i.test(file.name);
+    $('[data-sheet-setting]').hidden = isCsv;
+    $('[data-encoding-setting]').hidden = !isCsv;
+    message('Reading file locally…');
     try {
-      const parsed = await readAuditWorkbook(await file.arrayBuffer(), { sheet: Number($('[data-sheet]').value), chunkSize: Number($('[data-chunk]').value) });
+      const buffer = await file.arrayBuffer();
+      let parsed, source;
+      if (isCsv) {
+        const decoded = decodeAuditCsv(buffer, $('[data-encoding]').value);
+        parsed = readAuditCsv(decoded.text, { chunkSize: Number($('[data-chunk]').value) });
+        source = `CSV · ${decoded.encoding}`;
+      } else {
+        parsed = await readAuditWorkbook(buffer, { sheet: Number($('[data-sheet]').value), chunkSize: Number($('[data-chunk]').value) });
+        source = parsed.sheetName;
+      }
       if (token !== generation) return;
       header = parsed.header; records = auditTimeline(parsed);
       $('[data-search]').value = '';
       $('[data-workspace]').hidden = false;
-      message(`${parsed.sheetName} · ${records.length} calls · ${parsed.continuations} continuation rows reconstructed`);
+      message(`${source} · ${records.length} calls · ${parsed.continuations} continuation rows reconstructed`);
       if (records.length) renderDetail(records[0]);
       else { $('[data-detail]').innerHTML = '<p class="audit-muted">No calls in this worksheet.</p>'; renderTimeline(); }
     } catch (error) { if (token === generation) message(`Could not read the file: ${error.message}`); }

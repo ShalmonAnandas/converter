@@ -17,7 +17,10 @@ export function parseCsv(input, delimiter = ",") {
     }
     if (character === '"' && field === "" && !wasQuoted) { quoted = true; wasQuoted = true; continue; }
     if (character === delimiter) { row.push(field); field = ""; wasQuoted = false; continue; }
-    if (character === "\n") { row.push(field.replace(/\r$/, "")); rows.push(row); row = []; field = ""; wasQuoted = false; continue; }
+    if (character === "\n" || (character === "\r" && input[index + 1] === "\n")) {
+      if (character === "\r") index++;
+      row.push(field); rows.push(row); row = []; field = ""; wasQuoted = false; continue;
+    }
     field += character;
   }
   if (quoted) throw new Error("The input ends inside a quoted field");
