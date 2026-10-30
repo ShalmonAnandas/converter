@@ -46,11 +46,13 @@ sense. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> runs the current tool.
 
 ## Audit log viewer
 
-Open **Audit Log Viewer** and select an `.xlsx` audit export. The viewer reconstructs
+Open **Audit Log Viewer** and select an `.xlsx` or comma-delimited `.csv` audit export. The viewer reconstructs
 split fields in memory and presents API calls in timestamp order. Filter the timeline
 by operation, service, status or identifier, select a call to see its metadata, and
 open its FE or bank request and response fields in a formatted JSON viewer. Non-JSON
 fields are shown as raw text. All processing happens locally in the browser.
+
+CSV files are decoded as UTF-8 when valid, otherwise Windows-1252; you can select the encoding explicitly. CSV fields are kept whole, but shifted continuation rows are reconstructed if present. Scientific-notation IDs remain exactly as exported, since rounded digits cannot be recovered.
 
 The first two columns must be `Audit_Log_ID` and `Journey_Ref_No` with numeric IDs.
 Choose a worksheet and, if needed, adjust the export chunk size (default 32,759

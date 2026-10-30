@@ -1,5 +1,6 @@
 // Reconstruct the column-shifted continuation rows used by audit exports.
 import { createZip, csvRowsToXlsx, xlsxToRows } from './office.js';
+import { parseCsv } from './csv.js';
 
 const LIMIT = 32767;
 const safeName = value => String(value).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 100) || 'unknown';
@@ -77,6 +78,51 @@ export async function buildAuditExport(buffer, { sheet = 1, chunkSize = 32759, n
   files[`${base}_fixed.xlsx`] = fixed;
   files[`${base}_readable.txt`] = readable;
   return { ...result, sheetName: workbook.sheetNames[workbook.active], readable, extracted: used.size, bytes: await createZip(files) };
+}
+
+/** CSV rows normally contain complete values; some spreadsheet exports still
+ * carry shifted 32,759-character continuation fragments. */
+export function readAuditCsv(text, { chunkSize = 32759 } = {}) {
+  if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0) throw new Error('Chunk size must be a positive integer.');
+  const rows = parseCsv(text.replace(/^\uFEFF/, ''), ',');
+  const header = rows[0];
+  if (!header || header[0] !== 'Audit_Log_ID' || header[1] !== 'Journey_Ref_No') throw new Error('Expected Audit_Log_ID and Journey_Ref_No as the first two columns.');
+  if (header.some(h => !h) || new Set(header).size !== header.length) throw new Error('Headers must be unique, non-empty text.');
+  const records = [];
+  let pending = null, record = null, continuations = 0;
+  for (let n = 1; n < rows.length; n++) {
+    const row = rows[n];
+    if (!row.some(present)) continue;
+    const isStart = /^\d+$/.test(row[0] ?? '') && present(row[1]);
+    let last = row.length - 1;
+    while (last >= 0 && !present(row[last])) last--;
+    if (isStart) {
+      if (last >= header.length) throw new Error(`CSV record ${n + 1} has more fields than the header.`);
+      record = Array.from({length: header.length}, (_, i) => row[i] ?? '');
+      records.push(record);
+      pending = Array.from(row[last]).length === chunkSize ? last : null;
+      continue;
+    }
+    if (!record || pending === null) throw new Error(`CSV record ${n + 1} is not a recognized audit record or continuation.`);
+    let first = row.findIndex(present);
+    // A single shifted fragment is unambiguous; multiple shifted fields are not.
+    if (first > 0 && first !== last) throw new Error(`CSV record ${n + 1} has an ambiguous shifted continuation.`);
+    if (pending + last - first >= header.length) throw new Error(`CSV record ${n + 1} extends beyond the header.`);
+    record[pending] += row[first];
+    for (let i = first + 1; i <= last; i++) record[pending + i - first] = row[i] ?? '';
+    pending = Array.from(row[last]).length === chunkSize ? pending + last - first : null;
+    continuations++;
+  }
+  return { header, records, continuations };
+}
+
+export function decodeAuditCsv(buffer, encoding = 'auto') {
+  if (encoding === 'auto') {
+    try { return { text: new TextDecoder('utf-8', { fatal: true }).decode(buffer), encoding: 'UTF-8' }; }
+    catch { return { text: new TextDecoder('windows-1252').decode(buffer), encoding: 'Windows-1252' }; }
+  }
+  if (!['utf-8', 'windows-1252'].includes(encoding)) throw new Error('Unsupported CSV encoding.');
+  return { text: new TextDecoder(encoding, { fatal: true }).decode(buffer), encoding: encoding === 'utf-8' ? 'UTF-8' : 'Windows-1252' };
 }
 
 /** Read an audit worksheet, including the optional Overflow parts sheet. */
