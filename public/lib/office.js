@@ -226,7 +226,7 @@ export function columnIndex(name) {
 
 const NUMERIC = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
-export async function csvRowsToXlsx(rows, { sheetName = "Sheet1", headerRow = true } = {}) {
+export async function csvRowsToXlsx(rows, { sheetName = "Sheet1", headerRow = true, forceText = false } = {}) {
   const width = Math.max(1, ...rows.map((row) => row.length));
   const columnWidths = Array.from({ length: width }, (_, column) => Math.min(60, Math.max(10, ...rows.map((row) => String(row[column] ?? "").length + 2))));
   const sheet = rows.map((row, rowIndex) => {
@@ -234,7 +234,7 @@ export async function csvRowsToXlsx(rows, { sheetName = "Sheet1", headerRow = tr
       const reference = `${columnName(column)}${rowIndex + 1}`;
       const text = String(value ?? "");
       const style = headerRow && rowIndex === 0 ? ' s="1"' : "";
-      if (text !== "" && NUMERIC.test(text) && Math.abs(Number(text)) < 1e15) return `<c r="${reference}"${style}><v>${Number(text)}</v></c>`;
+      if (!forceText && text !== "" && NUMERIC.test(text) && Math.abs(Number(text)) < 1e15) return `<c r="${reference}"${style}><v>${Number(text)}</v></c>`;
       if (text === "") return `<c r="${reference}"${style}/>`;
       return `<c r="${reference}"${style} t="inlineStr"><is><t xml:space="preserve">${escapeXml(text)}</t></is></c>`;
     }).join("");
@@ -253,7 +253,7 @@ export async function csvRowsToXlsx(rows, { sheetName = "Sheet1", headerRow = tr
   });
 }
 
-export async function xlsxToRows(buffer, { sheet = 1 } = {}) {
+export async function xlsxToRows(buffer, { sheet = 1, rejectFormulas = false } = {}) {
   const files = await readZip(buffer);
   const decode = (name) => (files.has(name) ? new TextDecoder().decode(files.get(name)) : "");
   if (!files.has("xl/workbook.xml")) throw new Error("That file is not an XLSX workbook");
@@ -282,6 +282,8 @@ export async function xlsxToRows(buffer, { sheet = 1 } = {}) {
     const row = [];
     for (const cell of collect(rowNode, "c")) {
       const reference = attributeOf(cell, "r") ?? "";
+      if (rejectFormulas && collect(cell, "f").length) throw new Error(`Formula cell ${reference} cannot be safely repaired; export values only first.`);
+      if (rejectFormulas && attributeOf(cell, "t") === "e") throw new Error(`Error cell ${reference} cannot be safely repaired.`);
       const column = reference ? columnIndex(reference.match(/[A-Z]+/i)?.[0] ?? "A") : row.length;
       const type = attributeOf(cell, "t");
       let value;

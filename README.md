@@ -1,6 +1,6 @@
 # Converter
 
-A local-first workbench of **92 working developer tools** — data formats, text, encoding,
+A local-first workbench of **93 working developer tools** — data formats, text, encoding,
 cryptography, colour, networking, dates, and Office documents — in one page.
 
 Nothing you paste, drop, or open is uploaded. Every transform runs in your browser tab,
@@ -15,7 +15,7 @@ pnpm dev        # http://localhost:3000
 ```
 
 ```bash
-pnpm test       # 95 unit tests across the whole library
+pnpm test       # unit tests across the whole library
 pnpm typecheck  # syntax checks every module
 pnpm check      # typecheck + test
 pnpm build      # validates and copies the static artifact to dist/
@@ -37,12 +37,29 @@ Node 20 or newer. No install step is required — the project has no runtime dep
 | **Network** (6) | Subnet calculator, IP notation, IP ranges, IPv6, URL parser, user-agent parser |
 | **Numbers & Units** (6) | Base converter, Roman numerals, expression evaluator, unit converter, percentages, chmod |
 | **Date & Time** (4) | Timestamps & time zones, date difference, durations, cron expressions |
-| **Files & Documents** (5) | CSV⇄XLSX, Markdown⇄DOCX, Markdown→PDF, archive inspector, hex dump |
+| **Files & Documents** (6) | CSV⇄XLSX, audit log repair, Markdown⇄DOCX, Markdown→PDF, archive inspector, hex dump |
 | **Reference** (4) | MIME types, HTTP status codes, key codes, well-known ports |
 
 Every tool is deep-linkable (`/#/subnet`), reachable from the command palette
 (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>), and runs live as you type where that makes
 sense. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> runs the current tool.
+
+## Repair audit log exports
+
+Open **Audit Log Repair**, select an `.xlsx` export and choose the worksheet number.
+The first two headers must be `Audit_Log_ID` and `Journey_Ref_No`, with numeric
+identifiers marking each new record. The default 32,759-character chunk size matches
+the supplied export script; change it if your exporter uses a different split length.
+Unexpected or incomplete continuations stop the repair with an error.
+
+The result shows records with labelled fields and indents valid JSON for reading.
+Download the ZIP for a repaired XLSX, a readable text copy, and individual JSON files
+for fields exceeding Excel's 32,767 UTF-16-unit cell limit. The JSON files preserve
+`raw_data` and identify the journey, audit ID and column. Workbook cells contain
+references to those files. Everything stays in the browser. Process one workbook at a
+time; formulas and error cells are rejected. The workbook reader uses stored cell
+values, so Excel date-formatted numbers appear as serial numbers; formatting, formulas,
+and other workbook features are not copied.
 
 ## How a tool looks
 
