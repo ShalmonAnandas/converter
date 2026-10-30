@@ -1165,3 +1165,50 @@ dialog#commandDialog::backdrop { background: #0009; backdrop-filter: blur(4px); 
   .layout { display: block; }
   .pane { break-inside: avoid; }
 }
+
+/* Audit viewer */
+.audit-upload { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:24px 0 14px; padding:24px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); }
+.audit-upload h2, .audit-section-head h2, .audit-detail h2, .audit-dialog h2 { margin:0; font-size:1.15rem; }
+.audit-upload p, .audit-detail-head p { margin:7px 0 0; color:var(--text-muted); }
+.audit-file { cursor:pointer; white-space:nowrap; }
+.audit-settings { display:flex; gap:14px; align-items:end; flex-wrap:wrap; }
+.audit-settings label { display:grid; gap:5px; color:var(--text-muted); font-size:.8rem; }
+.audit-settings input, .audit-search { color:var(--text); background:var(--surface-sunken); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:9px 10px; }
+.audit-settings input { width:105px; }
+.audit-muted { color:var(--text-muted); font-size:.85rem; }
+.audit-message { color:var(--text-muted); font-size:.86rem; min-height:1.4em; margin:14px 0; }
+.audit-workspace { display:grid; grid-template-columns:minmax(260px, 370px) minmax(0, 1fr); gap:16px; align-items:start; }
+.audit-list-panel, .audit-detail { border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); min-width:0; }
+.audit-section-head { padding:18px 18px 10px; }
+.audit-search { display:block; width:calc(100% - 36px); margin:0 18px 8px; }
+.audit-timeline { max-height:75vh; overflow:auto; padding:4px 10px 12px; }
+.audit-call { width:100%; position:relative; display:flex; text-align:left; gap:12px; border:1px solid transparent; border-radius:var(--radius-sm); padding:12px 10px; color:var(--text); background:transparent; cursor:pointer; font:inherit; }
+.audit-call:hover { background:var(--surface-hover); }
+.audit-call[aria-pressed="true"] { background:var(--accent-soft); border-color:var(--accent-line); }
+.audit-dot { flex:none; width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:7px; }
+.audit-call-content { display:grid; min-width:0; gap:5px; }
+.audit-call-title { font-weight:700; overflow-wrap:anywhere; }
+.audit-call-time, .audit-call-meta { font-size:.8rem; color:var(--text-muted); overflow-wrap:anywhere; }
+.audit-call-meta { display:flex; gap:10px; flex-wrap:wrap; }
+.audit-empty { padding:12px; }
+.audit-detail { padding:22px; }
+.audit-eyebrow { font-size:.75rem; text-transform:uppercase; letter-spacing:.09em; color:var(--accent); }
+.audit-detail h2 { margin-top:6px; overflow-wrap:anywhere; }
+.audit-detail h3 { margin:26px 0 12px; font-size:1rem; }
+.audit-info { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px,1fr)); gap:14px; margin-top:22px; }
+.audit-info div { min-width:0; display:grid; gap:4px; }
+.audit-info span { color:var(--text-muted); font-size:.76rem; }
+.audit-info strong { font-size:.85rem; font-weight:500; overflow-wrap:anywhere; }
+.audit-payloads { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.audit-payload { text-align:left; display:grid; grid-template-columns:1fr auto; gap:8px; color:var(--text); font:inherit; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface-sunken); padding:15px; cursor:pointer; min-width:0; }
+.audit-payload:hover:enabled { border-color:var(--accent); }
+.audit-payload span { font-weight:700; }
+.audit-payload small { grid-column:1 / -1; grid-row:2; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.audit-payload:disabled { cursor:default; opacity:.65; }
+.audit-dialog { width:min(1050px,95vw); max-width:none; max-height:90vh; padding:22px; color:var(--text); background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+.audit-dialog::backdrop { background:#000a; }
+.audit-dialog-head { display:flex; gap:16px; justify-content:space-between; align-items:start; }
+.audit-dialog-head p { margin:6px 0; }
+.audit-dialog-tools { display:flex; gap:8px; align-items:center; margin:12px 0; }
+.audit-json { max-height:65vh; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; padding:18px; border-radius:var(--radius-sm); border:1px solid var(--line); background:var(--surface-sunken); font: .82rem/1.6 var(--mono); }
+@media (max-width: 760px) { .audit-upload { align-items:start; flex-direction:column; } .audit-workspace { grid-template-columns:1fr; } .audit-timeline { max-height:45vh; } .audit-payloads { grid-template-columns:1fr; } }

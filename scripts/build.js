@@ -1,7 +1,7 @@
 import { access, mkdir, cp, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-const required = ["public/index.html", "public/styles.css", "public/app.js", "public/registry.js", "public/favicon.svg", "vercel.json"];
+const required = ["public/index.html", "public/styles.css", "public/app.js", "public/audit-viewer.js", "public/registry.js", "public/favicon.svg", "vercel.json"];
 for (const file of required) await access(file);
 
 const modules = await readdir("public/lib");
