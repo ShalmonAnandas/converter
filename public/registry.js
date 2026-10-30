@@ -17,6 +17,7 @@ import * as maths from "./lib/mathx.js";
 import * as when from "./lib/datetime.js";
 import * as markup from "./lib/markup.js";
 import * as office from "./lib/office.js";
+import * as audit from "./lib/audit-log.js";
 import * as qr from "./lib/qrcode.js";
 import * as reference from "./lib/reference.js";
 import * as images from "./lib/image.js";
@@ -1348,6 +1349,25 @@ const timeTools = [
 /* ============================================================= files ==== */
 
 const fileTools = [
+  {
+    id: "audit-logs", layout: "stack", name: "Audit Log Repair", icon: "≡", blurb: "Repair split audit exports and inspect readable logs locally.",
+    keywords: ["audit", "logs", "overflow", "smartnow", "xlsx", "journey"],
+    fields: [
+      { id: "sheet", type: "number", label: "Worksheet number", value: 1, min: 1 },
+      { id: "chunkSize", type: "number", label: "Export chunk size", value: 32759, min: 1 },
+    ],
+    input: { accept: ".xlsx", hidden: true },
+    output: { filename: "repaired-logs.zip" },
+    run: async ({ file, options }) => {
+      requireFile(file, "xlsx");
+      const result = await audit.buildAuditExport(file.buffer, { sheet: Number(options.sheet), chunkSize: Number(options.chunkSize), name: file.name });
+      return {
+        text: result.readable || "No log records found.",
+        note: `${result.sheetName} · ${result.records.length} records · ${result.continuations} continuation rows · ${result.extracted} extracted fields. Download the ZIP for the repaired workbook, readable logs and JSON files.`,
+        download: { blob: blobFor(result.bytes, "application/zip"), name: file.name.replace(/\.xlsx$/i, "_fixed.zip") },
+      };
+    },
+  },
   {
     id: "spreadsheet", name: "CSV and XLSX", icon: "▤", blurb: "Build a real, styled XLSX workbook from CSV, or extract a worksheet back to CSV.",
     keywords: ["excel", "workbook", "sheet", "office", "xlsx"],
