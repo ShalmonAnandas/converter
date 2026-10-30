@@ -7,7 +7,7 @@
     "dev": "node scripts/serve.js",
     "build": "node scripts/build.js",
     "test": "node --test",
-    "typecheck": "node --check public/app.js && node --check public/registry.js && node --check scripts/serve.js && node --check scripts/build.js && for f in public/lib/*.js; do node --check \"$f\" || exit 1; done",
+    "typecheck": "node --check public/app.js && node --check public/audit-viewer.js && node --check public/registry.js && node --check scripts/serve.js && node --check scripts/build.js && for f in public/lib/*.js; do node --check \"$f\" || exit 1; done",
     "check": "npm run typecheck && npm test"
   },
   "engines": {

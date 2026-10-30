@@ -37,29 +37,28 @@ Node 20 or newer. No install step is required — the project has no runtime dep
 | **Network** (6) | Subnet calculator, IP notation, IP ranges, IPv6, URL parser, user-agent parser |
 | **Numbers & Units** (6) | Base converter, Roman numerals, expression evaluator, unit converter, percentages, chmod |
 | **Date & Time** (4) | Timestamps & time zones, date difference, durations, cron expressions |
-| **Files & Documents** (6) | CSV⇄XLSX, audit log repair, Markdown⇄DOCX, Markdown→PDF, archive inspector, hex dump |
+| **Files & Documents** (6) | CSV⇄XLSX, audit log viewer, Markdown⇄DOCX, Markdown→PDF, archive inspector, hex dump |
 | **Reference** (4) | MIME types, HTTP status codes, key codes, well-known ports |
 
 Every tool is deep-linkable (`/#/subnet`), reachable from the command palette
 (<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd>), and runs live as you type where that makes
 sense. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> runs the current tool.
 
-## Repair audit log exports
+## Audit log viewer
 
-Open **Audit Log Repair**, select an `.xlsx` export and choose the worksheet number.
-The first two headers must be `Audit_Log_ID` and `Journey_Ref_No`, with numeric
-identifiers marking each new record. The default 32,759-character chunk size matches
-the supplied export script; change it if your exporter uses a different split length.
-Unexpected or incomplete continuations stop the repair with an error.
+Open **Audit Log Viewer** and select an `.xlsx` audit export. The viewer reconstructs
+split fields in memory and presents API calls in timestamp order. Filter the timeline
+by operation, service, status or identifier, select a call to see its metadata, and
+open its FE or bank request and response fields in a formatted JSON viewer. Non-JSON
+fields are shown as raw text. All processing happens locally in the browser.
 
-The result shows records with labelled fields and indents valid JSON for reading.
-Download the ZIP for a repaired XLSX, a readable text copy, and individual JSON files
-for fields exceeding Excel's 32,767 UTF-16-unit cell limit. The JSON files preserve
-`raw_data` and identify the journey, audit ID and column. Workbook cells contain
-references to those files. Everything stays in the browser. Process one workbook at a
-time; formulas and error cells are rejected. The workbook reader uses stored cell
-values, so Excel date-formatted numbers appear as serial numbers; formatting, formulas,
-and other workbook features are not copied.
+The first two columns must be `Audit_Log_ID` and `Journey_Ref_No` with numeric IDs.
+Choose a worksheet and, if needed, adjust the export chunk size (default 32,759
+characters). A workbook with a separate `Overflow parts` sheet is also supported.
+Unexpected continuations, formulas and error cells are rejected. Excel date-formatted
+numeric cells are shown as their stored serial values. Separate JSON files referenced
+by an already-repaired workbook are not loaded into the viewer; use the original
+export or a workbook with an `Overflow parts` sheet for complete payloads.
 
 ## How a tool looks
 

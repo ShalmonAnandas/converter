@@ -3,6 +3,7 @@
 
 import { TOOLS, TOOL_CATEGORIES, TOOLS_BY_ID, searchTools, dependentOptions } from "./registry.js";
 import { formatBytes } from "./lib/bytes.js";
+import { createAuditViewer } from "./audit-viewer.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -49,6 +50,8 @@ const dom = {
   commandResults: $("#commandResults"),
   toast: $("#toast"),
 };
+
+const auditViewer = createAuditViewer($("#auditViewer"));
 
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
 
@@ -254,6 +257,11 @@ function openTool(id, { push = true, keepInput = false } = {}) {
 
   dom.home.hidden = true;
   dom.workbench.hidden = false;
+  const isAuditViewer = tool.id === "audit-logs";
+  $("#auditViewer").hidden = !isAuditViewer;
+  $("#genericControls").hidden = isAuditViewer;
+  $("#genericFooter").hidden = isAuditViewer;
+  dom.panes.hidden = isAuditViewer;
   dom.toolIcon.textContent = tool.icon;
   dom.toolTitle.textContent = tool.name;
   dom.toolBlurb.textContent = tool.blurb;
@@ -296,7 +304,7 @@ function openTool(id, { push = true, keepInput = false } = {}) {
   document.title = `${tool.name} — Converter`;
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 
-  if (shouldAutoRun()) run({ silent: true });
+  if (!isAuditViewer && shouldAutoRun()) run({ silent: true });
 }
 
 function runLabel() {

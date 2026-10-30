@@ -39,3 +39,52 @@ test('rejects formulas rather than silently losing expressions', async () => {
   const formulaWorkbook = await createZip(files);
   await assert.rejects(() => buildAuditExport(formulaWorkbook), /Formula cell C2/);
 });
+
+test('timeline sorts timestamps and keeps source payloads attached to each call', async () => {
+  const { auditTimeline } = await import('../public/lib/audit-log.js');
+  const h = ['Audit_Log_ID', 'Journey_Ref_No', 'FE_Request', 'Operation_Type', 'Created_On', 'Status_Code', 'Service_Name'];
+  const timeline = auditTimeline({ header: h, records: [
+    ['10', '2', '{"id":10}', 'Later', '2026-10-29 19:31:00+05:30', '500', 'svc'],
+    ['11', '2', '{"id":11}', 'Earlier', '2026-10-29 14:00:00Z', '200', 'svc'],
+    ['12', '2', 'raw', 'Unknown', '', '', 'svc'],
+  ] });
+  assert.deepEqual(timeline.map(r => r.operation), ['Earlier', 'Later', 'Unknown']);
+  assert.equal(timeline[0].row[2], '{"id":11}');
+  assert.equal(timeline[1].status, '500');
+});
+
+test('viewer reads original split exports with complete payloads', async () => {
+  const { readAuditWorkbook } = await import('../public/lib/audit-log.js');
+  const input = await csvRowsToXlsx([header, ['1','2','abcde'], ['fghij'], ['kl','response','tail']], { forceText: true });
+  const data = await readAuditWorkbook(input, { chunkSize: 5 });
+  assert.deepEqual(data.records[0], ['1','2','abcdefghijkl','response','tail']);
+  assert.equal(data.continuations, 2);
+});
+
+test('viewer rejoins a separate Overflow parts sheet in part order', async () => {
+  const { readAuditWorkbook } = await import('../public/lib/audit-log.js');
+  const main = await readZip(await csvRowsToXlsx([header, ['1','2','abc','response','tail']], { forceText: true }));
+  const parts = await readZip(await csvRowsToXlsx([
+    ['Audit_Log_ID','Journey_Ref_No','Field','Part','Text'],
+    ['1','2','Request','3','ghi'], ['1','2','Request','2','def'],
+  ], { forceText: true }));
+  const decoder = new TextDecoder();
+  const files = Object.fromEntries(main);
+  files['xl/worksheets/sheet2.xml'] = parts.get('xl/worksheets/sheet1.xml');
+  files['xl/workbook.xml'] = decoder.decode(main.get('xl/workbook.xml')).replace('</sheets>', '<sheet name="Overflow parts" sheetId="2" r:id="rId3"/></sheets>');
+  files['xl/_rels/workbook.xml.rels'] = decoder.decode(main.get('xl/_rels/workbook.xml.rels')).replace('</Relationships>', '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>');
+  const workbook = await createZip(files);
+  const data = await readAuditWorkbook(workbook);
+  assert.equal(data.records[0][2], 'abcdefghi');
+});
+
+test('JSON viewer preserves large numbers, duplicate keys, strings and raw non-JSON', async () => {
+  const { formatPayload } = await import('../public/lib/audit-log.js');
+  const source = '{"n":12345678901234567890,"n":1,"text":"a, {\\\"x\\\"}","empty":[],"obj":{}}';
+  const result = formatPayload(source);
+  assert.equal(result.valid, true);
+  assert.match(result.text, /12345678901234567890/);
+  assert.equal((result.text.match(/"n"/g) ?? []).length, 2);
+  assert.deepEqual(JSON.parse(result.text), JSON.parse(source));
+  assert.deepEqual(formatPayload('not json'), { text: 'not json', valid: false });
+});
